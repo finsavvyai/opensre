@@ -7,11 +7,15 @@ import sys
 from collections.abc import Iterable
 
 from prompt_toolkit import PromptSession
+from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.completion import CompleteEvent, Completer, Completion
 from prompt_toolkit.document import Document
 from prompt_toolkit.filters import has_completions
 from prompt_toolkit.formatted_text import ANSI
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.key_binding.key_processor import KeyPressEvent
+from prompt_toolkit.keys import Keys
+from prompt_toolkit.layout.controls import BufferControl
 from prompt_toolkit.styles import Style
 from rich.console import Console
 from rich.markup import escape
@@ -33,7 +37,11 @@ from app.cli.interactive_shell.theme import (
     PROMPT_ACCENT_ANSI,
 )
 
-_EXACT_SLASH_COMMAND_STYLE = f"{OPENCLAW_ORANGE} bg:#241913"
+_EXACT_SLASH_COMMAND_STYLE = f"{OPENCLAW_ORANGE} bg:default noreverse"
+
+
+def _is_slash_completion_text(text: str) -> bool:
+    return text.startswith("/") and not any(char.isspace() for char in text)
 
 
 class SlashCommandCompleter(Completer):
@@ -45,7 +53,7 @@ class SlashCommandCompleter(Completer):
         complete_event: CompleteEvent,  # noqa: ARG002 - required by prompt_toolkit protocol
     ) -> Iterable[Completion]:
         text = document.text_before_cursor
-        if not text.startswith("/") or any(char.isspace() for char in text):
+        if not _is_slash_completion_text(text):
             return
 
         needle = text.lower()
@@ -63,14 +71,42 @@ class SlashCommandCompleter(Completer):
                 )
 
 
+def _slash_completion_menu_position(buffer: Buffer) -> int | None:
+    """Anchor slash completions at the slash, not at the moving cursor."""
+    text = buffer.document.text_before_cursor
+    if _is_slash_completion_text(text):
+        return buffer.document.cursor_position - len(text)
+    return None
+
+
+def _attach_slash_completion_menu_position(prompt: PromptSession[str]) -> None:
+    for control in prompt.layout.find_all_controls():
+        if isinstance(control, BufferControl) and control.buffer is prompt.default_buffer:
+            control.menu_position = lambda: _slash_completion_menu_position(
+                prompt.default_buffer
+            )
+
+
+def _reopen_slash_completion_if_needed(buffer: Buffer) -> None:
+    if buffer.completer and _is_slash_completion_text(buffer.document.text_before_cursor):
+        buffer.start_completion(complete_event=CompleteEvent(text_inserted=True))
+
+
+def _delete_before_cursor_and_reopen_slash_completions(buffer: Buffer) -> None:
+    buffer.delete_before_cursor()
+    _reopen_slash_completion_if_needed(buffer)
+
+
 def _build_prompt_session() -> PromptSession[str]:
-    return PromptSession(
+    prompt: PromptSession[str] = PromptSession(
         completer=SlashCommandCompleter(),
         complete_while_typing=True,
         history=load_prompt_history(),
         key_bindings=_build_prompt_key_bindings(),
         style=_build_prompt_style(),
     )
+    _attach_slash_completion_menu_position(prompt)
+    return prompt
 
 
 def _build_slash_completer() -> SlashCommandCompleter:
@@ -88,18 +124,23 @@ def _build_prompt_key_bindings() -> KeyBindings:
     def _previous_completion(event: object) -> None:
         event.current_buffer.complete_previous()  # type: ignore[attr-defined]
 
+    @bindings.add(Keys.Backspace)
+    def _delete_before_cursor(event: KeyPressEvent) -> None:
+        _delete_before_cursor_and_reopen_slash_completions(event.current_buffer)
+
     return bindings
 
 
 def _build_prompt_style() -> Style:
     return Style.from_dict(
         {
-            "completion-menu.completion": "#c7c2bd bg:#141210",
-            "completion-menu.completion.current": f"{OPENCLAW_ORANGE} bg:#241913",
-            "completion-menu.meta.completion": "#7f7770 bg:#141210",
-            "completion-menu.meta.completion.current": f"{OPENCLAW_AMBER} bg:#241913",
-            "scrollbar.background": "bg:#141210",
-            "scrollbar.button": "bg:#3a2a22",
+            "completion-menu": "#c7c2bd bg:default noreverse",
+            "completion-menu.completion": "#c7c2bd bg:default noreverse",
+            "completion-menu.completion.current": f"{OPENCLAW_ORANGE} bg:default noreverse",
+            "completion-menu.meta.completion": "#7f7770 bg:default noreverse",
+            "completion-menu.meta.completion.current": f"{OPENCLAW_AMBER} bg:default noreverse",
+            "scrollbar.background": "bg:default noreverse",
+            "scrollbar.button": f"{OPENCLAW_ORANGE} bg:default noreverse",
         }
     )
 

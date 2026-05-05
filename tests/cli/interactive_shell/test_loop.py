@@ -6,11 +6,13 @@ from pathlib import Path
 
 import pytest
 from prompt_toolkit.application import create_app_session
+from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.completion import CompleteEvent
 from prompt_toolkit.document import Document
 from prompt_toolkit.history import FileHistory, InMemoryHistory
 from prompt_toolkit.input import DummyInput
 from prompt_toolkit.keys import Keys
+from prompt_toolkit.layout.controls import BufferControl
 from prompt_toolkit.output import DummyOutput
 
 from app.cli.interactive_shell import loop
@@ -32,6 +34,33 @@ def test_build_prompt_session_uses_persistent_history(
     assert tmp_path.exists()
     assert isinstance(prompt.completer, loop.SlashCommandCompleter)
     assert prompt.app.key_bindings is not None
+
+
+def test_slash_completion_menu_stays_anchored_at_input_start(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.constants as const_module
+
+    monkeypatch.setattr(const_module, "OPENSRE_HOME_DIR", tmp_path)
+
+    with create_app_session(input=DummyInput(), output=DummyOutput()):
+        prompt = loop._build_prompt_session()
+
+    controls = {
+        id(control): control
+        for control in prompt.layout.find_all_controls()
+        if isinstance(control, BufferControl) and control.buffer is prompt.default_buffer
+    }
+
+    assert len(controls) == 1
+    control = next(iter(controls.values()))
+    assert control.menu_position is not None
+
+    buffer = Buffer()
+    buffer.text = "/li"
+    buffer.cursor_position = len(buffer.text)
+    assert loop._slash_completion_menu_position(buffer) == 0
 
 
 def test_build_prompt_session_falls_back_to_memory_history(
@@ -110,13 +139,37 @@ def test_completion_menu_supports_up_down_navigation() -> None:
 
     assert (Keys.Down,) in keys
     assert (Keys.Up,) in keys
+    assert (Keys.Backspace,) in keys
+
+
+def test_backspace_reopens_slash_completion_after_valid_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    buffer = Buffer(completer=loop._build_slash_completer())
+    buffer.text = "/list"
+    buffer.cursor_position = len(buffer.text)
+    completion_events: list[CompleteEvent] = []
+
+    def _start_completion(*, complete_event: CompleteEvent | None = None) -> None:
+        if complete_event is not None:
+            completion_events.append(complete_event)
+
+    monkeypatch.setattr(buffer, "start_completion", _start_completion)
+
+    loop._delete_before_cursor_and_reopen_slash_completions(buffer)
+
+    assert buffer.text == "/lis"
+    assert completion_events
 
 
 def test_completion_menu_current_item_uses_subtle_highlight() -> None:
     style = loop._build_prompt_style()
+    menu_attrs = style.get_attrs_for_style_str("class:completion-menu")
     attrs = style.get_attrs_for_style_str("class:completion-menu.completion.current")
 
+    assert menu_attrs.bgcolor == "default"
+    assert menu_attrs.reverse is False
     assert attrs.color == "ff7a45"
-    assert attrs.bgcolor == "241913"
+    assert attrs.bgcolor == "default"
     assert attrs.reverse is False
     assert attrs.bold is False
