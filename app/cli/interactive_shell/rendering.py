@@ -37,6 +37,8 @@ def status_style(status: str) -> str:
     return {
         "ok": PRIMARY,
         "configured": PRIMARY,
+        "healthy": PRIMARY,
+        "passed": PRIMARY,
         "missing": WARNING,
         "failed": ERROR,
     }.get(status, TEXT_DIM)
