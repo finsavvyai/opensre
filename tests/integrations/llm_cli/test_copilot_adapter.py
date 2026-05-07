@@ -247,7 +247,25 @@ def test_explain_failure_includes_auth_hint_on_unauthorized() -> None:
         returncode=1,
     )
     assert "code 1" in msg
-    assert "/login" in msg or "COPILOT_GITHUB_TOKEN" in msg
+    assert "COPILOT_GITHUB_TOKEN" in msg or "/login" in msg
+    # Original error is preserved so the user does not lose context.
+    assert "unauthorized" in msg
+
+
+def test_explain_failure_does_not_mask_unrelated_error_with_login_in_text() -> None:
+    """Greptile P1 regression: the substring 'login' must not steal a real error.
+
+    A model-not-found error that happens to print the user's GitHub login should
+    surface verbatim, not be replaced with the auth hint.
+    """
+    adapter = CopilotAdapter()
+    err = "Your current login: johndoe@github.com — Error: model 'gpt-5.2' not found in your plan"
+    msg = adapter.explain_failure(stdout="", stderr=err, returncode=1)
+    # Real error text reaches the user.
+    assert "model 'gpt-5.2' not found" in msg
+    # Auth hint is NOT appended for a non-auth failure.
+    assert "COPILOT_GITHUB_TOKEN" not in msg
+    assert "/login" not in msg
 
 
 def test_explain_failure_truncates_long_output() -> None:

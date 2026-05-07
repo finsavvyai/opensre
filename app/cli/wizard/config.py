@@ -282,13 +282,15 @@ KIMI_MODELS = (
 
 
 # Empty value means "no --model" so Copilot CLI uses its configured default model.
+# We do not hardcode model identifiers here: the Copilot CLI's accepted --model
+# values are not stable across releases and live behind GitHub-side gating, so
+# baking them in risks "model not found" errors after the user has finished the
+# wizard. Users override via COPILOT_MODEL when they know what their plan exposes.
 COPILOT_MODELS = (
     ModelOption(
         value="",
         label="CLI default (no --model; use Copilot CLI configured model)",
     ),
-    ModelOption(value="claude-sonnet-4.6", label="Claude Sonnet 4.6 (via Copilot)"),
-    ModelOption(value="gpt-5.2", label="GPT-5.2 (via Copilot)"),
 )
 
 

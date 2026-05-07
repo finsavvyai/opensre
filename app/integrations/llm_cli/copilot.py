@@ -216,10 +216,22 @@ class CopilotAdapter:
         out = (stdout or "").strip()
         bits = [f"copilot -p exited with code {returncode}"]
         text = f"{err}\n{out}".lower()
-        if "not authenticated" in text or "login" in text or "unauthorized" in text:
-            bits.append(_AUTH_HINT)
-        elif err:
+        # Match only specific auth phrases so we never mask a real error that
+        # happens to contain the substring "login" (e.g. "Your current login:
+        # alice — Error: model 'X' not found in your plan").
+        auth_markers = (
+            "not logged in",
+            "not authenticated",
+            "no credentials",
+            "please /login",
+            "unauthorized",
+            "401",
+        )
+        is_auth_error = any(marker in text for marker in auth_markers)
+        if err:
             bits.append(err[:2000])
         elif out:
             bits.append(out[:2000])
+        if is_auth_error:
+            bits.append(_AUTH_HINT)
         return ". ".join(bits)
