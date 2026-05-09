@@ -262,6 +262,7 @@ class _CountingAnthropicBedrock:
 # Fake anthropic SDK exception subclasses that bypass the httpx-dependent
 # parent constructors while remaining valid isinstance targets.
 
+
 class _FakePermissionDeniedError(llm_client.PermissionDeniedError):
     def __init__(self, message: str = "") -> None:
         Exception.__init__(self, message)
