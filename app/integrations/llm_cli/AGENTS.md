@@ -107,12 +107,12 @@ out or fails to spawn (`logged_in=None`), so a configured API key still counts a
 Shared HTTP/API overrides live in `env_overrides.py`: use `nonempty_env_values(...)` with
 `OPENAI_PLATFORM_ENV_KEYS` (Codex), `HTTP_LLM_PROVIDER_ENV_KEYS` (OpenCode),
 `ANTHROPIC_CLI_ENV_KEYS` (Claude Code), `CURSOR_CLI_ENV_KEYS` (Cursor Agent headless API key),
-or `COPILOT_CLI_ENV_KEYS` (Copilot CLI token fallbacks: `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`).
+or `COPILOT_CLI_ENV_KEYS` (Copilot CLI credential envs: `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_TOKEN`) plus `COPILOT_CLI_CONFIG_ENV_KEYS` (`COPILOT_HOME`, `COPILOT_MODEL`).
 Extend those tuples when you add a matching API-key env to `LLMSettings`.
 
 **Kimi** does not use those tuples today: OAuth/API material is covered by forwarding any `KIMI_*` keys via `_SAFE_SUBPROCESS_ENV_PREFIXES`; `KimiAdapter.build()` uses `CLIInvocation(env=None)` and relies on that allowlist.
 
-The current prefix allowlist includes `CODEX_`, `CURSOR_`, `CLAUDE_`, `OPENCODE_`, `KIMI_`, `COPILOT_`, and locale keys (`LC_`).
+The current prefix allowlist includes `CODEX_`, `CURSOR_`, `CLAUDE_`, `OPENCODE_`, `KIMI_`, and locale keys (`LC_`). `COPILOT_` is deliberately NOT a prefix entry — `COPILOT_GITHUB_TOKEN` is a GitHub PAT, and a blanket prefix would leak it into every other CLI subprocess; the Copilot adapter forwards every Copilot-scoped env via its own `CLIInvocation.env` instead (see `COPILOT_CLI_ENV_KEYS` / `COPILOT_CLI_CONFIG_ENV_KEYS` in `env_overrides.py`).
 
 **If your CLI reads custom env vars** (e.g. `GEMINI_*`) you must add the
 relevant prefix to `_SAFE_SUBPROCESS_ENV_PREFIXES` in `subprocess_env.py`, otherwise the

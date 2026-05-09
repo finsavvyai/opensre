@@ -60,6 +60,7 @@ from app.integrations.llm_cli.binary_resolver import (
     resolve_cli_binary,
 )
 from app.integrations.llm_cli.env_overrides import (
+    COPILOT_CLI_CONFIG_ENV_KEYS,
     COPILOT_CLI_ENV_KEYS,
     nonempty_env_values,
 )
@@ -296,7 +297,14 @@ class CopilotAdapter:
         if resolved_model:
             argv.extend(["--model", resolved_model])
 
-        env = nonempty_env_values(COPILOT_CLI_ENV_KEYS)
+        # Forward Copilot's config + credential envs exclusively via this
+        # invocation env. The global subprocess prefix allowlist deliberately
+        # does NOT include ``COPILOT_`` (would leak ``COPILOT_GITHUB_TOKEN``,
+        # a GitHub PAT, into every other CLI subprocess).
+        env = {
+            **nonempty_env_values(COPILOT_CLI_CONFIG_ENV_KEYS),
+            **nonempty_env_values(COPILOT_CLI_ENV_KEYS),
+        }
         return CLIInvocation(
             argv=tuple(argv),
             stdin=None,

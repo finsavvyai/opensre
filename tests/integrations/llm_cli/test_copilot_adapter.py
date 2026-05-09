@@ -392,6 +392,21 @@ def test_build_forwards_token_env_keys(
     assert inv.env["GITHUB_TOKEN"] == "ghp_c"
 
 
+@patch("app.integrations.llm_cli.binary_resolver.shutil.which", return_value="/usr/bin/copilot")
+def test_build_forwards_copilot_config_envs(
+    _mock_which: MagicMock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """COPILOT_HOME / COPILOT_MODEL flow through the adapter's invocation env."""
+    _clean_copilot_env(monkeypatch)
+    monkeypatch.setenv("COPILOT_HOME", "/x/copilot")
+    monkeypatch.setenv("COPILOT_MODEL", "gpt-5.2")
+    inv = CopilotAdapter().build(prompt="p", model=None, workspace="")
+    assert inv.env is not None
+    assert inv.env["COPILOT_HOME"] == "/x/copilot"
+    assert inv.env["COPILOT_MODEL"] == "gpt-5.2"
+
+
 def test_build_raises_when_binary_unresolved(monkeypatch: pytest.MonkeyPatch) -> None:
     _clean_copilot_env(monkeypatch)
     with (
@@ -479,11 +494,15 @@ def test_cli_backed_client_invokes_copilot_and_forwards_token_env(
         logged_in=True,
         detail="ok",
     )
+    # Realistic invocation env — the real CopilotAdapter.build merges both
+    # the config tuple (COPILOT_HOME / COPILOT_MODEL) and the credential tuple
+    # (COPILOT_GITHUB_TOKEN / GH_TOKEN / GITHUB_TOKEN). The mock mirrors that
+    # so the test reflects the actual code path.
     mock_adapter.build.return_value = MagicMock(
         argv=["/usr/bin/copilot", "-p", "hi", "--silent"],
         stdin=None,
         cwd="/tmp",
-        env={"COPILOT_GITHUB_TOKEN": "ghp_runner"},
+        env={"COPILOT_GITHUB_TOKEN": "ghp_runner", "COPILOT_HOME": "/custom/copilot"},
         timeout_sec=30.0,
     )
     mock_adapter.parse.return_value = "answer"
@@ -498,9 +517,9 @@ def test_cli_backed_client_invokes_copilot_and_forwards_token_env(
 
     assert resp.content == "answer"
     env = mock_run.call_args.kwargs["env"]
-    # COPILOT_HOME forwarded via COPILOT_ prefix allowlist.
+    # All Copilot envs reach the subprocess via CLIInvocation.env, NOT via the
+    # global prefix allowlist (which deliberately excludes ``COPILOT_``).
     assert env["COPILOT_HOME"] == "/custom/copilot"
-    # Token env merged via adapter overrides.
     assert env["COPILOT_GITHUB_TOKEN"] == "ghp_runner"
     # Other CLI auth must not leak into the Copilot subprocess env.
     assert "ANTHROPIC_API_KEY" not in env
@@ -520,16 +539,34 @@ def test_registry_resolves_copilot_provider() -> None:
     assert isinstance(adapter, CopilotAdapter)
 
 
-def test_subprocess_env_forwards_copilot_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
-    """COPILOT_* env vars must reach the subprocess; ANTHROPIC_* must not."""
+def test_subprocess_env_does_not_leak_copilot_token_via_prefix_allowlist(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Greptile P1 SECURITY regression: ``COPILOT_*`` must NOT be a prefix entry.
+
+    A blanket ``COPILOT_`` prefix in ``_SAFE_SUBPROCESS_ENV_PREFIXES`` would
+    forward ``COPILOT_GITHUB_TOKEN`` (a GitHub PAT) into every other CLI
+    subprocess (Codex, Kimi, Claude Code, etc.). All Copilot envs must reach
+    the Copilot subprocess via ``CLIInvocation.env``, never via the global
+    prefix allowlist.
+    """
     from app.integrations.llm_cli.subprocess_env import build_cli_subprocess_env
 
     monkeypatch.setenv("COPILOT_HOME", "/x/copilot")
     monkeypatch.setenv("COPILOT_MODEL", "gpt-5.2")
+    monkeypatch.setenv("COPILOT_GITHUB_TOKEN", "ghp_super_secret")
+    monkeypatch.setenv("COPILOT_BIN", "/usr/local/bin/copilot")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "leak")
+
+    # Empty overrides simulates a non-Copilot adapter (e.g. Codex) running.
     env = build_cli_subprocess_env(None)
-    assert env["COPILOT_HOME"] == "/x/copilot"
-    assert env["COPILOT_MODEL"] == "gpt-5.2"
+
+    # No COPILOT_* may flow into a generic CLI subprocess env.
+    assert "COPILOT_GITHUB_TOKEN" not in env
+    assert "COPILOT_HOME" not in env
+    assert "COPILOT_MODEL" not in env
+    assert "COPILOT_BIN" not in env
+    # Cross-provider credentials still don't leak either.
     assert "ANTHROPIC_API_KEY" not in env
     # Sanity: PATH always forwarded for binary resolution.
     assert "PATH" in env or os.environ.get("PATH") is None

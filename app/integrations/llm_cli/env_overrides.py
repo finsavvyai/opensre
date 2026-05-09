@@ -41,10 +41,22 @@ ANTHROPIC_CLI_ENV_KEYS: Final[tuple[str, ...]] = (
 
 CURSOR_CLI_ENV_KEYS: Final[tuple[str, ...]] = ("CURSOR_API_KEY",)
 
-# GH_TOKEN and GITHUB_TOKEN are non-prefixed and so are NOT covered by the
-# ``COPILOT_`` entry in ``_SAFE_SUBPROCESS_ENV_PREFIXES`` — they must reach the
-# subprocess via ``CLIInvocation.env`` (built by ``CopilotAdapter.build``).
-# Do not drop them on the assumption the prefix allowlist forwards them.
+# Non-credential Copilot CLI config envs forwarded only via the Copilot
+# adapter's ``CLIInvocation.env``. They are deliberately NOT in
+# ``_SAFE_SUBPROCESS_ENV_PREFIXES``: scoping them to the Copilot subprocess
+# avoids confusing other vendor CLIs with vars they do not consume.
+COPILOT_CLI_CONFIG_ENV_KEYS: Final[tuple[str, ...]] = (
+    "COPILOT_HOME",
+    "COPILOT_MODEL",
+)
+
+# Copilot CLI credential envs. ``COPILOT_GITHUB_TOKEN`` is a GitHub PAT and
+# MUST NOT flow through the global ``_SAFE_SUBPROCESS_ENV_PREFIXES`` allowlist
+# (a ``COPILOT_`` prefix entry would forward this PAT into every CLI
+# subprocess — Codex, Kimi, Claude Code, etc. — which is a credential-leak
+# regression). The Copilot adapter forwards these *exclusively* via
+# ``CLIInvocation.env`` so they only reach the Copilot subprocess.
+# ``GH_TOKEN`` / ``GITHUB_TOKEN`` are non-prefixed for the same reason.
 COPILOT_CLI_ENV_KEYS: Final[tuple[str, ...]] = (
     "COPILOT_GITHUB_TOKEN",
     "GH_TOKEN",
