@@ -380,13 +380,26 @@ def build_observation(
     )
 
 
+def _canonical_artifact_name(canonical_report_payload: dict[str, Any], scenario_id: str) -> str:
+    """Derive a 12-hex-char content-addressed filename from the canonical payload + scenario id.
+
+    Using the canonical payload (not the full observation) means the filename is
+    stable across re-runs that produce the same scoring output, making ``git diff``
+    against ``_baseline/`` noise-free.
+    """
+    content = json.dumps(canonical_report_payload, sort_keys=True, separators=(",", ":"))
+    digest = sha256((content + scenario_id).encode("utf-8")).hexdigest()[:12]
+    return f"{digest}.json"
+
+
 def write_observation(observation: RunObservation, observations_dir: Path) -> Path:
     scenario_dir = observations_dir / observation.scenario_id
     scenario_dir.mkdir(parents=True, exist_ok=True)
 
-    status = "pass" if bool(observation.score.get("passed")) else "fail"
-    stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%SZ")
-    target = scenario_dir / f"{stamp}__{status}.json"
+    canonical_name = _canonical_artifact_name(
+        observation.canonical_report_payload, observation.scenario_id
+    )
+    target = scenario_dir / canonical_name
 
     payload = _drop_none_fields(asdict(observation))
     payload["observation_path"] = str(target.relative_to(observations_dir))

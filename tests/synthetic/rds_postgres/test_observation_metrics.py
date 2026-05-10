@@ -361,3 +361,69 @@ def test_canonical_payload_keys_are_stable() -> None:
             assert key in trajectory, (
                 f"{fixture.scenario_id}: canonical payload['trajectory'] missing key {key!r}"
             )
+
+
+def test_write_observation_canonical_filename_is_deterministic(tmp_path: Path) -> None:
+    """write_observation must produce the same filename for the same canonical payload."""
+    import re
+
+    fixtures = load_all_scenarios(SUITE_DIR)
+    fixture = fixtures[0]
+
+    # Build via build_observation so we get a full RunObservation
+    final_state: dict[str, Any] = {
+        "root_cause": "",
+        "root_cause_category": "unknown",
+        "validated_claims": [],
+        "non_validated_claims": [],
+        "causal_chain": [],
+        "evidence": {},
+        "executed_hypotheses": [],
+        "investigation_loop_count": 0,
+        "report": "",
+    }
+    score = score_result(fixture, final_state)
+    golden_trajectory, max_loops, golden_cfg = _resolved_golden_trajectory(fixture)
+    trajectory_metrics = compute_trajectory_metrics(
+        executed_hypotheses=[],
+        golden=golden_trajectory,
+        loops_used=0,
+        max_loops=max_loops,
+    )
+    trajectory_policy = (
+        evaluate_trajectory_policy(
+            metrics=trajectory_metrics,
+            golden_actions=golden_trajectory,
+            policy=_trajectory_policy_for_fixture(max_loops=max_loops, golden_cfg=golden_cfg),
+        )
+        if golden_cfg is not None
+        else None
+    )
+    score = _apply_trajectory_policy_to_score(score, trajectory_policy)
+    obs = build_observation(
+        scenario_id=fixture.scenario_id,
+        suite="axis1",
+        backend="FixtureGrafanaBackend",
+        score=asdict(score),
+        reasoning=None,
+        trajectory=trajectory_metrics,
+        evaluated_golden_actions=golden_trajectory,
+        trajectory_policy=trajectory_policy,
+        final_state=final_state,
+        available_evidence_sources=list(fixture.metadata.available_evidence),
+        required_evidence_sources=list(fixture.answer_key.required_evidence_sources),
+        started_at=datetime.now(UTC),
+        wall_time_s=0.0,
+    )
+
+    dir_a = tmp_path / "a"
+    dir_b = tmp_path / "b"
+    path_a = write_observation(obs, dir_a)
+    path_b = write_observation(obs, dir_b)
+
+    assert path_a.name == path_b.name, (
+        f"Non-deterministic filenames: {path_a.name!r} vs {path_b.name!r}"
+    )
+    assert re.fullmatch(r"[0-9a-f]{12}\.json", path_a.name), (
+        f"Filename {path_a.name!r} does not match content-addressed pattern"
+    )

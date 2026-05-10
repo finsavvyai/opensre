@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -236,6 +237,60 @@ def test_run_suite_json_mode_suppresses_report_render(
     )
 
     assert render_calls == []
+
+
+def test_run_suite_bulk_execution_suppresses_investigation_rendering(
+    monkeypatch: Any,
+    tmp_path: Path,
+) -> None:
+    fixture_a = load_scenario(SUITE_DIR / "000-healthy")
+    fixture_b = load_scenario(SUITE_DIR / "001-replication-lag")
+    fixtures = [fixture_a, fixture_b]
+    output_formats_seen: list[str | None] = []
+
+    monkeypatch.setenv("TRACER_OUTPUT_FORMAT", "rich")
+    monkeypatch.setattr(run_suite_module, "load_all_scenarios", lambda _suite_dir: fixtures)
+    monkeypatch.setattr(run_suite_module, "write_observation", _fake_write_observation)
+
+    def _fake_run_scenario(
+        fixture: Any,
+        use_mock_grafana: bool = False,  # noqa: ARG001
+        grafana_backend: Any = None,  # noqa: ARG001
+    ) -> tuple[dict[str, Any], Any]:
+        output_formats_seen.append(os.environ.get("TRACER_OUTPUT_FORMAT"))
+        return _make_deterministic_final_state(), _make_base_score(fixture)
+
+    monkeypatch.setattr(run_suite_module, "run_scenario", _fake_run_scenario)
+
+    run_suite_module.run_suite(["--levels", "1", "--observations-dir", str(tmp_path)])
+
+    assert output_formats_seen == ["none", "none"]
+    assert os.environ.get("TRACER_OUTPUT_FORMAT") == "rich"
+
+
+def test_run_suite_single_scenario_keeps_investigation_rendering_mode(
+    monkeypatch: Any,
+    tmp_path: Path,
+) -> None:
+    fixture = load_scenario(SUITE_DIR / "001-replication-lag")
+    output_formats_seen: list[str | None] = []
+
+    monkeypatch.setattr(run_suite_module, "load_all_scenarios", lambda _suite_dir: [fixture])
+    monkeypatch.setattr(run_suite_module, "write_observation", _fake_write_observation)
+
+    def _fake_run_scenario(
+        fixture: Any,
+        use_mock_grafana: bool = False,  # noqa: ARG001
+        grafana_backend: Any = None,  # noqa: ARG001
+    ) -> tuple[dict[str, Any], Any]:
+        output_formats_seen.append(os.environ.get("TRACER_OUTPUT_FORMAT"))
+        return _make_deterministic_final_state(), _make_base_score(fixture)
+
+    monkeypatch.setattr(run_suite_module, "run_scenario", _fake_run_scenario)
+
+    run_suite_module.run_suite(["--scenario", fixture.scenario_id, "--observations-dir", str(tmp_path)])
+
+    assert output_formats_seen == [None]
 
 
 # ---------------------------------------------------------------------------

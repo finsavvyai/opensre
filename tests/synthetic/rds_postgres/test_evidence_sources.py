@@ -204,6 +204,29 @@ def test_rds_events_detected_via_direct_key() -> None:
     assert results[0].present is True
 
 
+def test_ec2_instances_detected_via_runtime_mapped_keys() -> None:
+    state = {
+        "evidence": {
+            "ec2_instances": [{"instance_id": "i-123", "tier": "web"}],
+            "ec2_instances_by_tier": {"web": ["i-123"]},
+        }
+    }
+    results = evaluate(state, [EvidenceSourceId.EC2_INSTANCES_BY_TAG.value])
+    assert results[0].present is True
+
+
+def test_elb_target_health_detected_via_runtime_mapped_keys() -> None:
+    state = {
+        "evidence": {
+            "elb_target_groups": [{"TargetGroupArn": "tg-1"}],
+            "elb_healthy_targets": [{"instance_id": "i-123", "state": "healthy"}],
+            "elb_target_health_summary": {"healthy_count": 1},
+        }
+    }
+    results = evaluate(state, [EvidenceSourceId.ELB_TARGET_HEALTH.value])
+    assert results[0].present is True
+
+
 # ---------------------------------------------------------------------------
 # PI via grafana_metrics text content (secondary check)
 # ---------------------------------------------------------------------------
@@ -297,3 +320,36 @@ def test_score_result_fails_when_pi_required_but_only_cloudwatch_present() -> No
     )
     assert missing is not None
     assert "aws_performance_insights" in missing.detail
+
+
+@pytest.mark.parametrize(
+    "source_id,evidence_key",
+    [
+        (EvidenceSourceId.K8S_EVENTS.value, "k8s_events"),
+        (EvidenceSourceId.K8S_POD_METRICS.value, "k8s_pod_metrics"),
+        (EvidenceSourceId.K8S_NODE_METRICS.value, "k8s_node_metrics"),
+        (EvidenceSourceId.K8S_DNS_METRICS.value, "k8s_dns_metrics"),
+        (EvidenceSourceId.K8S_MESH_METRICS.value, "k8s_mesh_metrics"),
+        (EvidenceSourceId.K8S_ROLLOUT.value, "k8s_rollout"),
+    ],
+)
+def test_k8s_semantic_sources_detect_presence(source_id: str, evidence_key: str) -> None:
+    state = {"evidence": {evidence_key: {"sample": "value"}}}
+    presence = evaluate(state, [source_id])[0]
+    assert presence.present is True
+    assert presence.source_id == source_id
+
+
+@pytest.mark.parametrize(
+    "source_id",
+    [
+        EvidenceSourceId.K8S_EVENTS.value,
+        EvidenceSourceId.K8S_POD_METRICS.value,
+        EvidenceSourceId.K8S_NODE_METRICS.value,
+        EvidenceSourceId.K8S_DNS_METRICS.value,
+        EvidenceSourceId.K8S_MESH_METRICS.value,
+        EvidenceSourceId.K8S_ROLLOUT.value,
+    ],
+)
+def test_k8s_semantic_sources_report_missing_when_absent(source_id: str) -> None:
+    assert missing_sources({"evidence": {}}, [source_id]) == [source_id]

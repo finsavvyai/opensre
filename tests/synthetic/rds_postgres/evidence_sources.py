@@ -17,11 +17,11 @@ without importing heavy runtime dependencies.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class EvidenceSourceId(str, Enum):
+class EvidenceSourceId(StrEnum):
     """Canonical IDs matching ``VALID_EVIDENCE_SOURCES`` in ``tests/synthetic/schemas.py``."""
 
     AWS_CLOUDWATCH_METRICS = "aws_cloudwatch_metrics"
@@ -29,6 +29,12 @@ class EvidenceSourceId(str, Enum):
     AWS_PERFORMANCE_INSIGHTS = "aws_performance_insights"
     EC2_INSTANCES_BY_TAG = "ec2_instances_by_tag"
     ELB_TARGET_HEALTH = "elb_target_health"
+    K8S_EVENTS = "k8s_events"
+    K8S_POD_METRICS = "k8s_pod_metrics"
+    K8S_NODE_METRICS = "k8s_node_metrics"
+    K8S_DNS_METRICS = "k8s_dns_metrics"
+    K8S_MESH_METRICS = "k8s_mesh_metrics"
+    K8S_ROLLOUT = "k8s_rollout"
 
 
 @dataclass(frozen=True)
@@ -178,6 +184,13 @@ def _evidence_ec2_instances_by_tag(evidence: dict[str, Any]) -> EvidencePresence
             present=True,
             reason="ec2_instances_by_tag key populated in evidence",
         )
+    # Runtime mapper shape from app.nodes.investigate.processing.post_process.
+    if evidence.get("ec2_instances") or evidence.get("ec2_instances_by_tier"):
+        return EvidencePresence(
+            source_id=EvidenceSourceId.EC2_INSTANCES_BY_TAG,
+            present=True,
+            reason="ec2_instances/ec2_instances_by_tier populated (mapped ec2_instances_by_tag action)",
+        )
     return EvidencePresence(
         source_id=EvidenceSourceId.EC2_INSTANCES_BY_TAG,
         present=False,
@@ -193,10 +206,112 @@ def _evidence_elb_target_health(evidence: dict[str, Any]) -> EvidencePresence:
             present=True,
             reason="elb_target_health key populated in evidence",
         )
+    # Runtime mapper shape from app.nodes.investigate.processing.post_process.
+    if (
+        evidence.get("elb_target_groups")
+        or evidence.get("elb_healthy_targets")
+        or evidence.get("elb_unhealthy_targets")
+        or evidence.get("elb_target_health_summary")
+    ):
+        return EvidencePresence(
+            source_id=EvidenceSourceId.ELB_TARGET_HEALTH,
+            present=True,
+            reason="elb_target_* keys populated (mapped get_elb_target_health action)",
+        )
     return EvidencePresence(
         source_id=EvidenceSourceId.ELB_TARGET_HEALTH,
         present=False,
         reason="no elb_target_health evidence found",
+    )
+
+
+def _evidence_k8s_events(evidence: dict[str, Any]) -> EvidencePresence:
+    raw = evidence.get("k8s_events")
+    if raw:
+        return EvidencePresence(
+            source_id=EvidenceSourceId.K8S_EVENTS,
+            present=True,
+            reason="k8s_events key populated in evidence",
+        )
+    return EvidencePresence(
+        source_id=EvidenceSourceId.K8S_EVENTS,
+        present=False,
+        reason="no k8s_events evidence found",
+    )
+
+
+def _evidence_k8s_pod_metrics(evidence: dict[str, Any]) -> EvidencePresence:
+    raw = evidence.get("k8s_pod_metrics")
+    if raw:
+        return EvidencePresence(
+            source_id=EvidenceSourceId.K8S_POD_METRICS,
+            present=True,
+            reason="k8s_pod_metrics key populated in evidence",
+        )
+    return EvidencePresence(
+        source_id=EvidenceSourceId.K8S_POD_METRICS,
+        present=False,
+        reason="no k8s_pod_metrics evidence found",
+    )
+
+
+def _evidence_k8s_node_metrics(evidence: dict[str, Any]) -> EvidencePresence:
+    raw = evidence.get("k8s_node_metrics")
+    if raw:
+        return EvidencePresence(
+            source_id=EvidenceSourceId.K8S_NODE_METRICS,
+            present=True,
+            reason="k8s_node_metrics key populated in evidence",
+        )
+    return EvidencePresence(
+        source_id=EvidenceSourceId.K8S_NODE_METRICS,
+        present=False,
+        reason="no k8s_node_metrics evidence found",
+    )
+
+
+def _evidence_k8s_dns_metrics(evidence: dict[str, Any]) -> EvidencePresence:
+    raw = evidence.get("k8s_dns_metrics")
+    if raw:
+        return EvidencePresence(
+            source_id=EvidenceSourceId.K8S_DNS_METRICS,
+            present=True,
+            reason="k8s_dns_metrics key populated in evidence",
+        )
+    return EvidencePresence(
+        source_id=EvidenceSourceId.K8S_DNS_METRICS,
+        present=False,
+        reason="no k8s_dns_metrics evidence found",
+    )
+
+
+def _evidence_k8s_mesh_metrics(evidence: dict[str, Any]) -> EvidencePresence:
+    raw = evidence.get("k8s_mesh_metrics")
+    if raw:
+        return EvidencePresence(
+            source_id=EvidenceSourceId.K8S_MESH_METRICS,
+            present=True,
+            reason="k8s_mesh_metrics key populated in evidence",
+        )
+    return EvidencePresence(
+        source_id=EvidenceSourceId.K8S_MESH_METRICS,
+        present=False,
+        reason="no k8s_mesh_metrics evidence found",
+    )
+
+
+def _evidence_k8s_rollout(evidence: dict[str, Any]) -> EvidencePresence:
+    raw = evidence.get("k8s_rollout")
+    if raw:
+        return EvidencePresence(
+            source_id=EvidenceSourceId.K8S_ROLLOUT,
+            present=True,
+            reason="k8s_rollout key populated in evidence",
+        )
+    return EvidencePresence(
+        source_id=EvidenceSourceId.K8S_ROLLOUT,
+        present=False,
+        reason="no k8s_rollout evidence found",
     )
 
 
@@ -209,6 +324,12 @@ _PREDICATES = {
     EvidenceSourceId.AWS_RDS_EVENTS: _evidence_rds_events,
     EvidenceSourceId.EC2_INSTANCES_BY_TAG: _evidence_ec2_instances_by_tag,
     EvidenceSourceId.ELB_TARGET_HEALTH: _evidence_elb_target_health,
+    EvidenceSourceId.K8S_EVENTS: _evidence_k8s_events,
+    EvidenceSourceId.K8S_POD_METRICS: _evidence_k8s_pod_metrics,
+    EvidenceSourceId.K8S_NODE_METRICS: _evidence_k8s_node_metrics,
+    EvidenceSourceId.K8S_DNS_METRICS: _evidence_k8s_dns_metrics,
+    EvidenceSourceId.K8S_MESH_METRICS: _evidence_k8s_mesh_metrics,
+    EvidenceSourceId.K8S_ROLLOUT: _evidence_k8s_rollout,
 }
 
 
