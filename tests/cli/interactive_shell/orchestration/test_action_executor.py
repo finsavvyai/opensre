@@ -551,6 +551,40 @@ def test_run_synthetic_test_unknown_suite_records_failure() -> None:
     assert entry["ok"] is False
 
 
+def test_run_synthetic_test_unknown_scenario_sentinel_does_not_launch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``SYNTHETIC_UNKNOWN_PREFIX`` content reports the bad ID and skips Popen.
+
+    Regression: previously the planner silently substituted ``DEFAULT_SYNTHETIC_SCENARIO``
+    when the user asked for a non-existent numeric ID (e.g. "test 016"), so the
+    wrong scenario got launched. The executor must now refuse to launch and
+    report which scenarios are actually available.
+    """
+
+    def _popen_must_not_be_called(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("Popen should not be invoked for the unknown-scenario sentinel")
+
+    monkeypatch.setattr(
+        "app.cli.interactive_shell.orchestration.action_executor.subprocess.Popen",
+        _popen_must_not_be_called,
+    )
+
+    session = ReplSession()
+    buf = io.StringIO()
+    console = Console(file=buf, force_terminal=False)
+
+    run_synthetic_test("rds_postgres:unknown:016", session, console)
+
+    out = buf.getvalue()
+    assert "no synthetic scenario matches" in out.lower()
+    assert "016" in out
+    assert "001-replication-lag" in out, "available scenarios should be listed"
+    entry = session.history[-1]
+    assert entry["type"] == "synthetic_test"
+    assert entry["ok"] is False
+
+
 def test_run_synthetic_test_streams_subprocess_output(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

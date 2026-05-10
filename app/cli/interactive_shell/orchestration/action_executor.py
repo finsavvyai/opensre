@@ -21,7 +21,11 @@ from rich.markup import escape
 from rich.text import Text
 
 import app.cli.interactive_shell.intent.intent_parser as _intent_parser
-from app.cli.interactive_shell.orchestration.action_planner import DEFAULT_SYNTHETIC_SCENARIO
+from app.cli.interactive_shell.orchestration.action_planner import (
+    DEFAULT_SYNTHETIC_SCENARIO,
+    SYNTHETIC_UNKNOWN_PREFIX,
+    _list_rds_postgres_scenarios,
+)
 from app.cli.interactive_shell.orchestration.execution_policy import (
     evaluate_code_agent_launch,
     evaluate_investigation_launch,
@@ -1027,6 +1031,22 @@ def run_synthetic_test(
     action_already_listed: bool = False,
 ) -> None:
     suite_spec = suite_name.strip().lower()
+
+    # The planner emits this sentinel when the user explicitly named a numeric
+    # scenario ID that isn't in the on-disk suite (e.g. "test 016" when only
+    # 000-015 exist). Surface the error before any execution-policy / subprocess
+    # work so we never silently launch the default scenario in its place.
+    if suite_spec.startswith(SYNTHETIC_UNKNOWN_PREFIX):
+        hint = suite_spec[len(SYNTHETIC_UNKNOWN_PREFIX) :]
+        console.print(f"[{ERROR}]no synthetic scenario matches[/] '{escape(hint)}'.")
+        available = _list_rds_postgres_scenarios()
+        if available:
+            console.print(f"Available scenarios ({len(available)}):")
+            for name in available:
+                console.print(f"  • {name}")
+        session.record("synthetic_test", suite_name, ok=False)
+        return
+
     resolved_suite_name = ""
     resolved_scenario = DEFAULT_SYNTHETIC_SCENARIO
     if suite_spec == "rds_postgres":

@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from app.cli.interactive_shell.orchestration.action_planner import (
+    SYNTHETIC_UNKNOWN_PREFIX,
     _list_rds_postgres_scenarios,
     plan_actions_with_unhandled,
     plan_cli_actions,
@@ -117,11 +118,39 @@ def test_plan_synthetic_test_uses_llm_resolver_when_no_full_scenario_id(
     assert plan_cli_actions(message) == []
 
 
-def test_plan_synthetic_test_unknown_bare_number_falls_back_to_default(
+def test_plan_synthetic_test_unknown_numeric_id_emits_unknown_sentinel(
     _clear_scenario_cache: None,
 ) -> None:
-    """When the LLM resolver declines (``None``), use the default scenario."""
+    """A user-specified numeric ID with no matching scenario surfaces an error.
+
+    Regression: previously this silently fell back to ``DEFAULT_SYNTHETIC_SCENARIO``
+    (``001-replication-lag``), so asking to run ``test 999`` actually ran
+    ``001-replication-lag`` without telling the user. Now the planner emits a
+    ``SYNTHETIC_UNKNOWN_PREFIX`` sentinel and the executor reports the mismatch.
+    """
     msg = "run synthetic test 999"
+    with patch(
+        "app.cli.interactive_shell.orchestration.action_planner.resolve_synthetic_scenario_with_llm",
+        return_value=None,
+    ):
+        actions, unhandled = plan_actions_with_unhandled(msg)
+
+    assert not unhandled
+    assert [(a.kind, a.content) for a in actions] == [
+        ("synthetic_test", f"{SYNTHETIC_UNKNOWN_PREFIX}999")
+    ]
+
+
+def test_plan_synthetic_test_without_numeric_hint_still_falls_back_to_default(
+    _clear_scenario_cache: None,
+) -> None:
+    """A bare request without any scenario hint keeps the convenience default.
+
+    "run a single synthetic test" carries no specific intent, so falling back
+    to ``DEFAULT_SYNTHETIC_SCENARIO`` is still the right UX. The unknown-sentinel
+    path is reserved for user-specified IDs that genuinely don't exist.
+    """
+    msg = "run a single synthetic test"
     with patch(
         "app.cli.interactive_shell.orchestration.action_planner.resolve_synthetic_scenario_with_llm",
         return_value=None,

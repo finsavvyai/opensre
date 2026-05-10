@@ -38,7 +38,20 @@ _SYNTHETIC_SCENARIO_ID_RE = re.compile(
     r"\b(?P<scenario>\d{3}-[a-z0-9][a-z0-9-]*)\b",
     re.IGNORECASE,
 )
+
+# Numeric scenario hint, e.g. "16", "016", "test 7", "scenario #3". Bounded to
+# 1-4 digits to avoid matching long unrelated numeric tokens (timestamps, IDs).
+# The capture group is the raw user token; we left-pad to 3 digits when
+# comparing against the directory prefix.
+_SYNTHETIC_NUMERIC_HINT_RE = re.compile(r"\b(?P<num>\d{1,4})\b")
+
 DEFAULT_SYNTHETIC_SCENARIO = "001-replication-lag"
+
+# Sentinel content emitted when the user pointed at a specific (non-existent)
+# scenario. The planner threads this through to the executor instead of silently
+# falling back to ``DEFAULT_SYNTHETIC_SCENARIO``, so the user sees an explicit
+# "no such scenario" error rather than the wrong test getting launched.
+SYNTHETIC_UNKNOWN_PREFIX = "rds_postgres:unknown:"
 
 # ``parents[4]`` is the repo root. The earlier ``parents[3]`` survived from
 # when this module lived in the flat ``interactive_shell/`` layout, and after
@@ -79,6 +92,31 @@ def _list_rds_postgres_scenarios() -> tuple[str, ...]:
     )
 
 
+def _detect_unresolved_numeric_hint(
+    text: str,
+    scenarios: tuple[str, ...],
+) -> str | None:
+    """Return the raw numeric token the user typed when it doesn't match any scenario.
+
+    The user typing ``test 16`` when the suite only ships ``000``–``015`` is a
+    different failure mode than ``run a synthetic test`` (no scenario given at
+    all): the first deserves an explicit "no such scenario" error rather than a
+    silent fallback to ``DEFAULT_SYNTHETIC_SCENARIO``. We detect this by
+    scanning for a 1–4 digit token in *text* and checking the left-padded
+    3-digit prefix against the allowlist.
+
+    Returns the raw user-typed digits (e.g. ``"16"``) so the caller can quote
+    them verbatim in the error message, or ``None`` when every numeric token in
+    the text already matches a known scenario (or none was found at all).
+    """
+    for match in _SYNTHETIC_NUMERIC_HINT_RE.finditer(text):
+        raw = match.group("num")
+        padded = raw.zfill(3) if len(raw) <= 3 else raw
+        if not any(name.startswith(f"{padded}-") for name in scenarios):
+            return raw
+    return None
+
+
 def _synthetic_action_content(clause: PromptClause, *, synthetic_start: int) -> tuple[str, int]:
     """Resolve the scenario the user asked for to a ``rds_postgres:<id>`` token.
 
@@ -88,8 +126,13 @@ def _synthetic_action_content(clause: PromptClause, *, synthetic_start: int) -> 
     2. Otherwise an LLM intent classifier picks the scenario from the live
        allowlist. This handles bare numbers ("003", "test 3"), descriptive
        phrases ("the storage full one", "cpu saturation"), and typos.
-    3. If the LLM is unavailable / undecided, fall back to the default
-       scenario so the planner never silently misroutes to a stale ID.
+    3. If the LLM declines AND the user pointed at a specific numeric ID that
+       doesn't exist in the allowlist, emit a ``SYNTHETIC_UNKNOWN_PREFIX``
+       sentinel so the executor can surface a tailored "no such scenario"
+       error rather than silently running ``DEFAULT_SYNTHETIC_SCENARIO``.
+    4. Otherwise (no specific hint, or LLM unavailable on a generic request),
+       fall back to the default scenario so a bare ``run a synthetic test``
+       still launches something useful.
     """
     full_match = _SYNTHETIC_SCENARIO_ID_RE.search(clause.text)
     if full_match is not None:
@@ -104,6 +147,13 @@ def _synthetic_action_content(clause: PromptClause, *, synthetic_start: int) -> 
     if resolved is not None:
         return (
             f"rds_postgres:{resolved}",
+            clause.position + synthetic_start,
+        )
+
+    unresolved_hint = _detect_unresolved_numeric_hint(clause.text, scenarios)
+    if unresolved_hint is not None:
+        return (
+            f"{SYNTHETIC_UNKNOWN_PREFIX}{unresolved_hint}",
             clause.position + synthetic_start,
         )
 
@@ -251,6 +301,8 @@ def plan_terminal_tasks(message: str) -> list[str]:
 
 
 __all__ = [
+    "DEFAULT_SYNTHETIC_SCENARIO",
+    "SYNTHETIC_UNKNOWN_PREFIX",
     "plan_actions",
     "plan_actions_with_unhandled",
     "plan_cli_actions",
