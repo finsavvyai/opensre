@@ -67,6 +67,11 @@
       "actual": "extra_actions_count=0",
       "status": "pass",
       "threshold": "extra_actions_count == 0"
+    },
+    "trajectory_policy": {
+      "actual": "not_applicable",
+      "status": "pass",
+      "threshold": "not_applicable \u2014 no golden trajectory configured"
     }
   },
   "report_schema_version": "report_v2",

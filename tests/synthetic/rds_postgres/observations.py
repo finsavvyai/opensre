@@ -13,6 +13,19 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+# Re-exported for backward compatibility — canonical definitions live in trajectory_policy.py
+from tests.synthetic.rds_postgres.trajectory_policy import (
+    TrajectoryPolicy,
+    TrajectoryPolicyResult,
+    evaluate_trajectory_policy,
+)
+
+__all__ = [
+    "TrajectoryPolicy",
+    "TrajectoryPolicyResult",
+    "evaluate_trajectory_policy",
+]
+
 
 @dataclass(frozen=True)
 class TrajectoryMetrics:
@@ -29,22 +42,6 @@ class TrajectoryMetrics:
     max_loops: int | None
     loop_calibration_ok: bool | None
     failed_action_count: int
-
-
-@dataclass(frozen=True)
-class TrajectoryPolicy:
-    matching: str
-    max_edit_distance: int | None = None
-    max_extra_actions: int | None = None
-    max_redundancy: int | None = None
-    max_loops: int | None = None
-
-
-@dataclass(frozen=True)
-class TrajectoryPolicyResult:
-    passed: bool
-    matching: str
-    violations: list[str]
 
 
 @dataclass(frozen=True)
@@ -275,46 +272,6 @@ def _score_with_process_metrics(
 ) -> dict[str, Any]:
     """Return score payload with process metrics first for readability."""
     return {"process_metrics": _process_metrics_summary(trajectory), **score}
-
-
-def evaluate_trajectory_policy(
-    metrics: TrajectoryMetrics,
-    golden_actions: list[str],
-    policy: TrajectoryPolicy | None,
-) -> TrajectoryPolicyResult | None:
-    if not golden_actions or policy is None:
-        return None
-
-    violations: list[str] = []
-    matching = policy.matching
-
-    if matching == "strict" and metrics.strict_match is not True:
-        violations.append("strict sequence mismatch")
-    elif matching == "lcs" and metrics.lcs_ratio != 1.0:
-        violations.append(f"lcs_ratio={_fmt_ratio(metrics.lcs_ratio)} < 1.00")
-    elif matching == "set" and metrics.missing_actions:
-        violations.append(f"missing actions: {', '.join(metrics.missing_actions)}")
-
-    if (
-        policy.max_edit_distance is not None
-        and metrics.edit_distance is not None
-        and metrics.edit_distance > policy.max_edit_distance
-    ):
-        violations.append(f"edit_distance={metrics.edit_distance} > {policy.max_edit_distance}")
-    if policy.max_extra_actions is not None:
-        extra_count = len(metrics.extra_actions)
-        if extra_count > policy.max_extra_actions:
-            violations.append(f"extra_actions={extra_count} > {policy.max_extra_actions}")
-    if policy.max_redundancy is not None and metrics.redundancy_count > policy.max_redundancy:
-        violations.append(f"redundancy_count={metrics.redundancy_count} > {policy.max_redundancy}")
-    if policy.max_loops is not None and metrics.loops_used > policy.max_loops:
-        violations.append(f"loops_used={metrics.loops_used} > {policy.max_loops}")
-
-    return TrajectoryPolicyResult(
-        passed=not violations,
-        matching=matching,
-        violations=violations,
-    )
 
 
 def compute_trajectory_metrics(

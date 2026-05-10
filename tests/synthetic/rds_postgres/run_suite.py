@@ -799,8 +799,39 @@ def _apply_trajectory_policy_to_score(
     score: ScenarioScore,
     trajectory_policy: TrajectoryPolicyResult | None,
 ) -> ScenarioScore:
-    if trajectory_policy is None or trajectory_policy.passed:
-        return score
+    """Apply the trajectory policy result to the score, always recording the gate.
+
+    The gate is recorded in ALL cases (pass, fail, not-applicable) so that
+    ``_all_required_gates_pass`` acts as a true hard gate rather than silently
+    accepting a missing ``trajectory_policy`` entry.
+    """
+    gates = dict(score.gates)
+
+    if trajectory_policy is None:
+        # No golden trajectory in this scenario — record as not_applicable.
+        gates["trajectory_policy"] = GateResult(
+            status="pass",
+            threshold="not_applicable — no golden trajectory configured",
+            actual="not_applicable",
+        )
+        return replace(
+            score,
+            passed=_all_required_gates_pass(gates) and not score.failure_reasons,
+            gates=gates,
+        )
+
+    gates["trajectory_policy"] = GateResult(
+        status="pass" if trajectory_policy.passed else "fail",
+        threshold="policy violations list must be empty",
+        actual=f"violations={trajectory_policy.violations}",
+    )
+
+    if trajectory_policy.passed:
+        return replace(
+            score,
+            passed=_all_required_gates_pass(gates) and not score.failure_reasons,
+            gates=gates,
+        )
 
     policy_reason = "trajectory policy failed: " + "; ".join(
         trajectory_policy.violations or ["unknown violation"]
@@ -809,12 +840,6 @@ def _apply_trajectory_policy_to_score(
     if not any(detail.code == "TRAJECTORY_POLICY_FAILED" for detail in failures):
         failures.append(FailureDetail(code="TRAJECTORY_POLICY_FAILED", detail=policy_reason))
 
-    gates = dict(score.gates)
-    gates["trajectory_policy"] = GateResult(
-        status="pass" if trajectory_policy.passed else "fail",
-        threshold="policy violations list must be empty",
-        actual=f"violations={trajectory_policy.violations}",
-    )
     combined_reason = "; ".join(detail.detail for detail in failures)
 
     return replace(
