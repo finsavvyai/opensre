@@ -299,9 +299,7 @@ def test_baseline_check_passes_against_committed_baseline(
             _make_base_score(fixture),
         ),
     )
-    monkeypatch.setattr(
-        run_suite_module, "write_observation", _fake_write_observation_baseline
-    )
+    monkeypatch.setattr(run_suite_module, "write_observation", _fake_write_observation_baseline)
 
     # Should not raise SystemExit
     run_suite_module.run_suite(
@@ -345,9 +343,7 @@ def test_baseline_check_detects_drift(
             _make_base_score(fixture),
         ),
     )
-    monkeypatch.setattr(
-        run_suite_module, "write_observation", _fake_write_observation_baseline
-    )
+    monkeypatch.setattr(run_suite_module, "write_observation", _fake_write_observation_baseline)
 
     with pytest.raises(SystemExit) as exc_info:
         run_suite_module.run_suite(
