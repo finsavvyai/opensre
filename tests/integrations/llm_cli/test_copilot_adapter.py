@@ -299,9 +299,7 @@ def test_detect_linux_libsecret_entry_is_logged_in(
     """
     mock_sys.platform = "linux"
 
-    import app.integrations.llm_cli.copilot as copilot_mod
-
-    # `shutil.which` is shared across modules; patch it in one place.
+    # `shutil.which` is shared across modules; patch it once via dotted path.
     def fake_which(cmd: str, *a: object, **kw: object) -> str | None:
         if cmd in ("copilot", "copilot.cmd"):
             return "/usr/bin/copilot"
@@ -309,7 +307,7 @@ def test_detect_linux_libsecret_entry_is_logged_in(
             return "/usr/bin/secret-tool"
         return None
 
-    monkeypatch.setattr(copilot_mod.shutil, "which", fake_which)
+    monkeypatch.setattr("shutil.which", fake_which)
 
     libsecret_hit = MagicMock(returncode=0, stdout="", stderr="")
 
@@ -341,12 +339,11 @@ def test_detect_gh_auth_token_is_logged_in_fallback(
 
     Stdout is discarded by the adapter, so we assert returncode-only behavior.
     """
-    import app.integrations.llm_cli.copilot as copilot_mod
 
-    # `shutil.which` is shared across modules — patch in one place. The resolver
-    # checks copilot binary names first, then the adapter checks `gh` and
-    # `secret-tool`. Returning a real-looking path for `copilot` and `gh` only
-    # is the minimum surface needed.
+    # `shutil.which` is shared across modules — patch once via dotted path. The
+    # resolver checks copilot binary names first, then the adapter checks `gh`
+    # and `secret-tool`. Returning a real-looking path for `copilot` and `gh`
+    # only is the minimum surface needed.
     def fake_which(cmd: str, *a: object, **kw: object) -> str | None:
         if cmd in ("copilot", "copilot.cmd"):
             return "/usr/bin/copilot"
@@ -354,7 +351,7 @@ def test_detect_gh_auth_token_is_logged_in_fallback(
             return "/usr/bin/gh"
         return None
 
-    monkeypatch.setattr(copilot_mod.shutil, "which", fake_which)
+    monkeypatch.setattr("shutil.which", fake_which)
 
     def side_effect(args: list[str], **_kwargs: object) -> MagicMock:
         if len(args) >= 2 and args[1] == "--version":
