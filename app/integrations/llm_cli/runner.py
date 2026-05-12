@@ -13,7 +13,11 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.integrations.llm_cli.base import CLIProbe, LLMCLIAdapter
-from app.integrations.llm_cli.errors import CLIAuthenticationRequired, CLITimeoutError
+from app.integrations.llm_cli.errors import (
+    CLIAuthenticationRequired,
+    CLITemporaryError,
+    CLITimeoutError,
+)
 from app.integrations.llm_cli.subprocess_env import build_cli_subprocess_env
 from app.integrations.llm_cli.text import flatten_messages_to_prompt
 from app.llm_reasoning_effort import get_active_reasoning_effort
@@ -173,6 +177,8 @@ class CLIBackedLLMClient:
                 )
             else:
                 message = base
+            if proc.returncode == 75:  # EX_TEMPFAIL: transient, not a code bug
+                raise CLITemporaryError(message)
             raise RuntimeError(message)
 
         content = self._adapter.parse(stdout=out, stderr=err, returncode=proc.returncode)

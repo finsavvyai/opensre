@@ -244,6 +244,44 @@ def test_cli_backed_client_invoke_forwards_kimi_env(mock_run: MagicMock) -> None
     assert "OPENAI_API_KEY" not in env
 
 
+@patch("app.integrations.llm_cli.runner.subprocess.run")
+def test_cli_backed_client_raises_temporary_error_on_exit_75(mock_run: MagicMock) -> None:
+    """EX_TEMPFAIL (75) must raise CLITemporaryError, not RuntimeError, so Sentry ignores it."""
+    import pytest
+
+    from app.integrations.llm_cli.errors import CLITemporaryError
+    from app.integrations.llm_cli.kimi import KimiAdapter
+    from app.integrations.llm_cli.runner import CLIBackedLLMClient
+
+    mock_adapter = MagicMock(spec=KimiAdapter)
+    mock_adapter.name = "kimi"
+    mock_adapter.detect.return_value = MagicMock(
+        installed=True,
+        bin_path="/usr/bin/kimi",
+        logged_in=True,
+        detail="ok",
+    )
+    mock_adapter.build.return_value = MagicMock(
+        argv=["/usr/bin/kimi", "--print", "--yolo"],
+        stdin="hello",
+        cwd="/tmp",
+        env=None,
+        timeout_sec=30.0,
+    )
+    resume_msg = "To resume this session: kimi -r 79229edd-9caf-45af-bb89-04d3f742d063"
+    mock_adapter.explain_failure.return_value = f"kimi exited with code 75. {resume_msg}"
+    mock_run.return_value = MagicMock(returncode=75, stdout=resume_msg, stderr="")
+
+    with (
+        patch("app.guardrails.engine.get_guardrail_engine") as gr,
+        patch.dict(os.environ, {}, clear=False),
+    ):
+        gr.return_value.is_active = False
+        client = CLIBackedLLMClient(mock_adapter, model="kimi-k2.5", max_tokens=256)
+        with pytest.raises(CLITemporaryError, match="kimi exited with code 75"):
+            client.invoke("hello")
+
+
 def test_parse_and_explain_failure() -> None:
     adapter = KimiAdapter()
 
