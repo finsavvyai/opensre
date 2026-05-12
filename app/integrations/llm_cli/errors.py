@@ -11,6 +11,14 @@ class CLITimeoutError(RuntimeError):
     """
 
 
+class CLITransientError(RuntimeError):
+    """The CLI subprocess exited with a transient/recoverable failure (e.g. session pause).
+
+    Treated as an expected operational failure (not a bug), so callers should
+    not forward it to error-tracking services like Sentry.
+    """
+
+
 class CLIAuthenticationRequired(RuntimeError):
     """CLI probe reported the user is definitely not authenticated (`logged_in=False`).
 
