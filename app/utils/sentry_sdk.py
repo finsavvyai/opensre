@@ -62,7 +62,7 @@ _OPERATOR_ACTIONABLE_LLM_ERROR_PATTERNS: tuple[re.Pattern[str], ...] = (
     # Anthropic hard quota: "You have reached your specified API usage limits."
     re.compile(r"\bapi usage limits\b", re.I),
     # kimi session interrupted mid-run (exit 75); not a code bug, nothing to fix in Sentry.
-    re.compile(r"\bto resume this session\b", re.I),
+    re.compile(r"\bkimi\s+-r\s+[0-9a-f-]{36}\b", re.I),
 )
 
 
