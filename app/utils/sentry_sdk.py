@@ -48,7 +48,7 @@ _OPERATOR_ACTIONABLE_LLM_ERROR_PATTERNS: tuple[re.Pattern[str], ...] = (
     # Anthropic / OpenAI account-level limits that only the operator can resolve.
     re.compile(r"\bapi usage limits?\b", re.I),
     re.compile(r"\bcredit balance is too low\b", re.I),
-    re.compile(r"\brate limit exceeded\b", re.I),
+    re.compile(r"\brate limit exceeded\b.*\b(?:quota|billing|HTTP 4[02]9)\b", re.I),
     # Auth failures — wrong key, expired key, missing key.
     re.compile(r"\bauthentication failed\.\s+Check\s+\S+_API_KEY\b", re.I),
     re.compile(r"\bmissing\s+[A-Z0-9_]+_API_KEY\b", re.I),
