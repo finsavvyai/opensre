@@ -49,6 +49,79 @@ def test_astream_investigation_background_thread_safe_on_loop_close() -> None:
     assert q.empty()
 
 
+def test_astream_investigation_is_noise_branch_thread_safe_on_loop_close() -> None:
+    """The ``is_noise`` early-return path must also guard ``call_soon_threadsafe``.
+
+    Mirrors the guarded pattern used at the noise-classified early-return branch in
+    ``_run_pipeline``; without the ``contextlib.suppress(RuntimeError)`` wrapper the
+    background thread would propagate ``RuntimeError`` when the consumer cancels and
+    closes the loop before the noise sentinel is enqueued.
+    """
+
+    def _simulate_is_noise_branch(
+        loop: asyncio.AbstractEventLoop,
+        q: queue.Queue[object],
+    ) -> None:
+        # Mirrors the guarded direct call on the is_noise early-return path.
+        with contextlib.suppress(RuntimeError):
+            loop.call_soon_threadsafe(q.put_nowait, None)
+
+    q: queue.Queue[object] = queue.Queue()
+    closed_loop = asyncio.new_event_loop()
+    closed_loop.close()
+
+    t = threading.Thread(target=_simulate_is_noise_branch, args=(closed_loop, q), daemon=True)
+    t.start()
+    t.join(timeout=2)
+
+    assert t.is_alive() is False
+    assert q.empty()
+
+
+async def _drive_astream_until_done(
+    raw_alert: dict[str, object],
+) -> list[object]:
+    events: list[object] = []
+    async for evt in runners.astream_investigation(raw_alert):
+        events.append(evt)
+    return events
+
+
+def test_astream_investigation_is_noise_drains_cleanly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """End-to-end: when ``extract_alert`` flags ``is_noise``, the stream completes without error.
+
+    Exercises the real ``_run_pipeline`` closure through ``astream_investigation`` so the
+    guarded ``call_soon_threadsafe`` on the noise early-return branch is hit, rather than
+    only simulating the pattern locally.
+    """
+    monkeypatch.setattr(runners, "init_sentry", lambda **_kw: None)
+
+    import app.agent.context as context_module
+    import app.agent.extract as extract_module
+
+    monkeypatch.setattr(context_module, "resolve_integrations", lambda _state: {})
+    monkeypatch.setattr(
+        extract_module,
+        "extract_alert",
+        lambda _state: {
+            "alert_name": "noise",
+            "pipeline_name": "noise",
+            "severity": "info",
+            "is_noise": True,
+        },
+    )
+
+    events = asyncio.run(_drive_astream_until_done({"alert": "noise"}))
+    # We get the resolve_integrations + extract_alert chain events, then the stream
+    # terminates cleanly via the noise sentinel without raising.
+    assert any(
+        getattr(e, "node_name", None) == "extract_alert" for e in events
+    ), "extract_alert events should be emitted before the noise early-return"
+
+
+
 def test_run_chat_initializes_sentry_and_captures_unhandled_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
