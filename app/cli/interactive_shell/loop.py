@@ -1024,13 +1024,9 @@ async def _run_interactive(
                     break
                 if _looks_like_confirmation_answer(answer):
                     state.deliver_confirmation(answer or "")
-                    # Let the worker thread clear ``confirm_event`` (see
-                    # ``_route_confirm_through_prompt``) before we re-check
-                    # ``is_awaiting_confirmation()`` — avoids a duplicate y/N
-                    # frame on the next loop iteration.
-                    await asyncio.sleep(0)
-                # Invalid answer: redisplay confirmation prompt.
-                continue
+                else:
+                    # Invalid answer: redisplay confirmation prompt.
+                    continue
 
             _write_spinner()
 
