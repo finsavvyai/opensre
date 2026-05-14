@@ -41,9 +41,7 @@ def test_astream_investigation_background_thread_safe_on_loop_close() -> None:
     closed_loop = asyncio.new_event_loop()
     closed_loop.close()
 
-    t = threading.Thread(
-        target=_simulate_run_pipeline, args=(closed_loop, q), daemon=True
-    )
+    t = threading.Thread(target=_simulate_run_pipeline, args=(closed_loop, q), daemon=True)
     t.start()
     t.join(timeout=2)
 
