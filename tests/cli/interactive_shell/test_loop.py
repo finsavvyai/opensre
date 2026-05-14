@@ -1044,6 +1044,23 @@ class TestReplState:
         assert state.is_dispatch_running() is False
         assert state.current_cancel_event is None
 
+    def test_cancel_next_queued_turn_drops_pending_turn_and_completes_future(self) -> None:
+        async def _scenario() -> None:
+            state = loop._ReplState()
+            done = asyncio.get_running_loop().create_future()
+            await state.queue.put(("queued turn", done))
+
+            assert state.cancel_next_queued_turn() is True
+            assert state.queue.empty() is True
+            assert done.done() is True
+            await asyncio.wait_for(state.queue.join(), timeout=0.05)
+
+        asyncio.run(_scenario())
+
+    def test_cancel_next_queued_turn_returns_false_when_queue_empty(self) -> None:
+        state = loop._ReplState()
+        assert state.cancel_next_queued_turn() is False
+
     def test_per_dispatch_cancel_events_are_isolated(self) -> None:
         """Regression guard for the shared-event race that used to let
         a previous turn's worker-thread observation get clobbered by

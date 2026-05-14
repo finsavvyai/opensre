@@ -598,6 +598,20 @@ class _ReplState:
             else:
                 task.cancel()
 
+    def cancel_next_queued_turn(self) -> bool:
+        """Drop one queued-but-not-yet-started turn, if present.
+
+        Returns True when a queued turn was removed.
+        """
+        try:
+            _text, turn_done = self.queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return False
+        if not turn_done.done():
+            turn_done.set_result(None)
+        self.queue.task_done()
+        return True
+
 
 class _SpinnerState:
     """Mutable state read by the prompt's bottom-toolbar callback.
@@ -826,11 +840,13 @@ async def _run_interactive(
             state.is_dispatch_running()
             or state.current_cancel_event is not None
             or state.is_awaiting_confirmation()
-            or not state.queue.empty()
         ):
             state.cancel_current_dispatch()
             return True
-        return False
+        # Queue hand-off window: input was enqueued but dispatch task has
+        # not yet been created. Drop one pending turn so Ctrl+C still behaves
+        # as "cancel current work".
+        return not state.queue.empty() and state.cancel_next_queued_turn()
 
     set_sigint_delegate(_sigint_delegate)
 
