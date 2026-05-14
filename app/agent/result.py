@@ -142,14 +142,23 @@ Evidence keys collected: {", ".join(evidence.keys()) if evidence else "none"}
     def _to_claim_dicts(claims: list[str], status: str) -> list[dict]:
         return [{"claim": c, "validation_status": status} for c in claims if c]
 
+    validated_claims = _to_claim_dicts(schema.validated_claims, "validated")
+    non_validated_claims = _to_claim_dicts(schema.non_validated_claims, "not_validated")
+    validity_score = _resolve_validity_score(
+        llm_validity_score=schema.validity_score,
+        validated_claims=validated_claims,
+        non_validated_claims=non_validated_claims,
+        evidence=evidence,
+    )
+
     return InvestigationResult(
         root_cause=schema.root_cause,
         root_cause_category=schema.root_cause_category,
         causal_chain=schema.causal_chain,
-        validated_claims=_to_claim_dicts(schema.validated_claims, "validated"),
-        non_validated_claims=_to_claim_dicts(schema.non_validated_claims, "not_validated"),
+        validated_claims=validated_claims,
+        non_validated_claims=non_validated_claims,
         remediation_steps=schema.remediation_steps,
-        validity_score=schema.validity_score,
+        validity_score=validity_score,
     )
 
 
@@ -176,3 +185,37 @@ def _parse_via_legacy(
     except Exception as err:
         logger.warning("Legacy parse_root_cause also failed: %s", err)
         return InvestigationResult.unknown(alert_name)
+
+
+def _resolve_validity_score(
+    *,
+    llm_validity_score: float,
+    validated_claims: list[dict[str, Any]],
+    non_validated_claims: list[dict[str, Any]],
+    evidence: dict[str, Any],
+) -> float:
+    """Use LLM score when present; otherwise derive a bounded deterministic fallback."""
+    if llm_validity_score > 0:
+        return max(0.0, min(1.0, float(llm_validity_score)))
+    return _deterministic_validity_fallback(
+        validated_count=len(validated_claims),
+        non_validated_count=len(non_validated_claims),
+        evidence_count=len(evidence),
+    )
+
+
+def _deterministic_validity_fallback(
+    *,
+    validated_count: int,
+    non_validated_count: int,
+    evidence_count: int,
+) -> float:
+    """Compute fallback confidence from evidence coverage and claim quality."""
+    if validated_count <= 0 or evidence_count <= 0:
+        return 0.0
+
+    total_claims = validated_count + max(non_validated_count, 0)
+    claim_ratio = 1.0 if total_claims <= 0 else validated_count / total_claims
+    evidence_factor = min(max(evidence_count, 0) / 5.0, 1.0)
+    score = 0.4 + (0.4 * claim_ratio) + (0.2 * evidence_factor)
+    return min(score, 0.9)

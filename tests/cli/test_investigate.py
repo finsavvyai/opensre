@@ -109,7 +109,38 @@ def test_run_investigation_cli_shapes_agent_state(monkeypatch) -> None:
         "root_cause": "bad deploy",
         "is_noise": False,
         "validity_score": 0.0,
+        "warnings": [
+            "No tool evidence was collected for this investigation. If this alert depends on "
+            "integrations (for example Datadog, EKS, Grafana, or CloudWatch), configure and "
+            "verify those integrations, then rerun investigate."
+        ],
     }
+
+
+def test_run_investigation_cli_omits_warning_when_evidence_exists(monkeypatch) -> None:
+    def fake_run_investigation(
+        *,
+        raw_alert: dict[str, object],
+        **_: object,
+    ) -> dict[str, object]:
+        return {
+            "slack_message": "report body",
+            "problem_md": "# problem",
+            "root_cause": "bad deploy",
+            "validity_score": 0.0,
+            "evidence_entries": [{"source": "datadog"}],
+        }
+
+    monkeypatch.setattr("app.cli.investigation.investigate.LLMSettings.from_env", object)
+    monkeypatch.setattr(
+        "app.cli.investigation.investigate._call_run_investigation", fake_run_investigation
+    )
+
+    result = run_investigation_cli(
+        raw_alert={"alert_name": "PayloadAlert"},
+    )
+
+    assert "warnings" not in result
 
 
 def test_run_investigation_cli_evaluate_reports_skip_when_no_rubric(monkeypatch) -> None:

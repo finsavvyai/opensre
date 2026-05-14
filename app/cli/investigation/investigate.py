@@ -143,6 +143,9 @@ def run_investigation_cli(
     }
     if state.get("evidence_entries"):
         out["tool_calls"] = state["evidence_entries"]
+    warnings = _build_investigation_warnings(state)
+    if warnings:
+        out["warnings"] = warnings
     if opensre_evaluate:
         ev = state.get("opensre_llm_eval")
         if isinstance(ev, dict) and ev:
@@ -161,6 +164,19 @@ def run_investigation_cli(
                 "reason": "Evaluate was enabled but no judge output was recorded.",
             }
     return out
+
+
+def _build_investigation_warnings(state: AgentState) -> list[str]:
+    """Return user-facing investigation warnings for ambiguous zero-confidence runs."""
+    evidence_entries = state.get("evidence_entries") or []
+    validity_score = float(state.get("validity_score", 0.0) or 0.0)
+    if validity_score > 0 or evidence_entries:
+        return []
+    return [
+        "No tool evidence was collected for this investigation. "
+        "If this alert depends on integrations (for example Datadog, EKS, Grafana, or CloudWatch), "
+        "configure and verify those integrations, then rerun investigate."
+    ]
 
 
 def stream_investigation_cli(
