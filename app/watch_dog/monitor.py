@@ -28,6 +28,7 @@ def run_watchdog(
     Updates ``task`` progress each tick; dispatches Telegram on threshold breach.
     ``interval_seconds`` is both the inter-sample delay and the CPU percent window
     passed to :func:`~app.agents.probe.probe` (floored for stability).
+    With ``once`` and no threshold flags, completes after the first successful sample.
     """
     sample_interval = max(float(interval_seconds), 0.1)
 
@@ -84,9 +85,16 @@ def run_watchdog(
                     _notify_alarm("max_runtime", detail)
                 fired_once = True
 
-            if once and fired_once:
-                task.mark_completed(result="alarm (once)")
-                return
+            any_threshold = (
+                max_cpu is not None or max_rss_mib is not None or max_runtime_seconds is not None
+            )
+            if once:
+                if fired_once:
+                    task.mark_completed(result="alarm (once)")
+                    return
+                if not any_threshold:
+                    task.mark_completed(result="single sample (once)")
+                    return
 
             if task.cancel_requested.is_set():
                 task.mark_cancelled()

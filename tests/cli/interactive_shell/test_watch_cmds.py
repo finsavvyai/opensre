@@ -189,3 +189,45 @@ def test_run_watchdog_respects_cancel(monkeypatch: pytest.MonkeyPatch) -> None:
     task.request_cancel()
     thread.join(timeout=3.0)
     assert task.status == TaskStatus.CANCELLED
+
+
+def test_run_watchdog_once_without_thresholds_exits(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``--once`` with no threshold flags must finish after one sample (Greptile #1969)."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.agents.probe import ProcessSnapshot
+    from app.cli.interactive_shell.runtime.tasks import TaskRegistry
+    from app.watch_dog.monitor import run_watchdog
+
+    reg = TaskRegistry()
+    task = reg.create(TaskKind.WATCHDOG, command="watchdog pid=1")
+    task.mark_running()
+    dispatcher = MagicMock()
+    dispatcher.dispatch = MagicMock(return_value=True)
+
+    started_at = datetime.now(UTC) - timedelta(seconds=1)
+    snap = ProcessSnapshot(
+        pid=1,
+        cpu_percent=1.0,
+        rss_mb=10.0,
+        num_fds=None,
+        num_connections=None,
+        status="running",
+        started_at=started_at,
+    )
+    monkeypatch.setattr("app.watch_dog.monitor.probe", lambda *_a, **_kw: snap)
+
+    run_watchdog(
+        task=task,
+        watched_pid=1,
+        interval_seconds=0.1,
+        max_cpu=None,
+        max_runtime_seconds=None,
+        max_rss_mib=None,
+        once=True,
+        dispatcher=dispatcher,
+        on_alarm=None,
+    )
+    assert task.status == TaskStatus.COMPLETED
+    assert task.result == "single sample (once)"
+    dispatcher.dispatch.assert_not_called()

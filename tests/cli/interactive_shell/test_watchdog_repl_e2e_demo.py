@@ -5,7 +5,8 @@ This file is the reviewer-facing "proper e2e demo": it drives the same
 /unwatch) with a real background watchdog thread and a stubbed ``probe`` so
 CI stays deterministic and offline.
 
-Human transcript for PR screenshots: ``repl_watchdog_demo.md`` in this directory.
+For the GitHub **Demo/Screenshot** box, paste the steps from ``docs/DEVELOPMENT.md``
+(**Interactive shell: REPL watchdog demo**) or ``repl_watchdog_demo.md`` in this directory.
 
 Run only this module::
 
@@ -65,7 +66,7 @@ def test_repl_watchdog_end_to_end_demo_script(monkeypatch: pytest.MonkeyPatch) -
 
     assert (
         dispatch_slash(
-            f"/watch {pid} --max-cpu 95 --interval 0.15",
+            f"/watch {pid} --max-cpu 80 --interval 0.15",
             session,
             console,
             is_tty=True,
