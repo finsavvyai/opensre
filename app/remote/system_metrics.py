@@ -124,10 +124,14 @@ def _memory_linux() -> dict[str, Any] | None:
 
 def _memory_darwin() -> dict[str, Any] | None:
     total_bytes = int(
-        subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True, encoding="utf-8", errors="replace").strip()
+        subprocess.check_output(
+            ["sysctl", "-n", "hw.memsize"], text=True, encoding="utf-8", errors="replace"
+        ).strip()
     )
     user_bytes = int(
-        subprocess.check_output(["sysctl", "-n", "hw.usermem"], text=True, encoding="utf-8", errors="replace").strip()
+        subprocess.check_output(
+            ["sysctl", "-n", "hw.usermem"], text=True, encoding="utf-8", errors="replace"
+        ).strip()
     )
     total_gb = round(total_bytes / (1024**3), 1)
     available_gb = round(user_bytes / (1024**3), 1)
