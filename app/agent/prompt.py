@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.types.root_cause_categories import render_prompt_taxonomy
+from app.types.root_cause_categories import HERMES_ROOT_CAUSE_CATEGORIES, render_prompt_taxonomy
 
 _INVESTIGATION_SYSTEM = """You are Tracer, an AI SRE performing a live production incident investigation.
 
@@ -30,15 +30,12 @@ Your task: investigate the alert below and produce a clear, evidence-backed root
 
 When you are done investigating (no more tool calls), write a diagnosis that includes:
 - **Root cause**: What failed and why (2-3 sentences, specific)
-- **Root cause category**: Use exactly one category name from the taxonomy below
+- **Root cause category**: {root_cause_category_instruction}
 - **Evidence**: Which tool results support your conclusion
 - **Validated claims**: Specific facts confirmed by evidence (e.g. "Error rate spiked to 47% at 14:32 UTC per Grafana logs")
 - **Non-validated claims**: Hypotheses you could not confirm
 - **Remediation steps**: Ordered, concrete actions to fix the issue
 - **Validity score**: 0.0–1.0 reflecting your confidence based on evidence quality
-
-## Root cause category taxonomy (single source of truth)
-{root_cause_taxonomy}
 """
 
 _ALERT_CONTEXT_TEMPLATE = """## Alert
@@ -97,9 +94,29 @@ _ALERT_SOURCE_TO_TOOL_SOURCES: dict[str, list[str]] = {
 # Generic fallback sources — always secondary, never primary.
 _SECONDARY_SOURCES = {"knowledge", "openclaw", "google_docs"}
 
+_DEFAULT_ROOT_CAUSE_CATEGORY_INSTRUCTION = (
+    "One of database / infrastructure / code_bug / configuration / network / performance / "
+    "healthy / unknown"
+)
 
-def build_system_prompt(_state: dict[str, Any]) -> str:
-    return _INVESTIGATION_SYSTEM.format(root_cause_taxonomy=render_prompt_taxonomy().strip())
+
+def build_system_prompt(state: dict[str, Any]) -> str:
+    alert_source = _get_alert_source(state)
+    root_cause_category_instruction = _DEFAULT_ROOT_CAUSE_CATEGORY_INSTRUCTION
+
+    if alert_source == "hermes":
+        taxonomy = render_prompt_taxonomy(
+            HERMES_ROOT_CAUSE_CATEGORIES | {"healthy", "unknown"}
+        ).strip()
+        root_cause_category_instruction = (
+            "Use exactly one category name from the Hermes taxonomy below\n\n"
+            "## Hermes root cause category taxonomy (single source of truth)\n"
+            f"{taxonomy}"
+        )
+
+    return _INVESTIGATION_SYSTEM.format(
+        root_cause_category_instruction=root_cause_category_instruction
+    )
 
 
 def format_alert_context(state: dict[str, Any]) -> str:
