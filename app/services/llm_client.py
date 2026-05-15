@@ -1254,7 +1254,7 @@ def parse_root_cause(response: str) -> RootCauseResult:
                 if candidate in VALID_ROOT_CAUSE_CATEGORIES:
                     root_cause_category = candidate
                     break
-                token_match = re.search(r"[a-z0-9_]+", candidate)
+                token_match = re.search(r"[a-z_][a-z0-9_]*", candidate)
                 if token_match:
                     token = token_match.group(0)
                     if token in VALID_ROOT_CAUSE_CATEGORIES:
