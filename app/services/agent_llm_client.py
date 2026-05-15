@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -63,8 +64,6 @@ def _openai_tokens_param(model: str) -> str:
     compatible with OpenAI-compatible third-party endpoints that haven't added
     'max_completion_tokens' yet.
     """
-    import re
-
     return "max_completion_tokens" if re.match(r"^o[0-9]", model) else "max_tokens"
 
 
