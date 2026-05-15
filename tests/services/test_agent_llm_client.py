@@ -5,7 +5,7 @@ import types
 
 import pytest
 
-from app.services.agent_llm_client import BedrockAgentClient
+from app.services.agent_llm_client import BedrockAgentClient, _openai_tokens_param
 
 
 def _install_fake_anthropic(monkeypatch: pytest.MonkeyPatch) -> types.SimpleNamespace:
@@ -37,6 +37,24 @@ def _install_fake_anthropic(monkeypatch: pytest.MonkeyPatch) -> types.SimpleName
     fake_module.AnthropicBedrock = AnthropicBedrock
     monkeypatch.setitem(sys.modules, "anthropic", fake_module)
     return fake_module
+
+
+@pytest.mark.parametrize(
+    "model,expected",
+    [
+        ("o1", "max_completion_tokens"),
+        ("o1-mini", "max_completion_tokens"),
+        ("o3", "max_completion_tokens"),
+        ("o3-mini", "max_completion_tokens"),
+        ("o4-mini", "max_completion_tokens"),
+        ("gpt-4o", "max_tokens"),
+        ("gpt-4-turbo", "max_tokens"),
+        ("gpt-5.4", "max_tokens"),
+        ("openai/o3", "max_tokens"),  # routed via OpenRouter — not a bare o-series name
+    ],
+)
+def test_openai_tokens_param(model: str, expected: str) -> None:
+    assert _openai_tokens_param(model) == expected
 
 
 def test_bedrock_client_requires_region_env(monkeypatch: pytest.MonkeyPatch) -> None:

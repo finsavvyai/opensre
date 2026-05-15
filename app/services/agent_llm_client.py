@@ -54,6 +54,20 @@ def _anthropic_tool_schema(tool: Any) -> dict[str, Any]:
     }
 
 
+def _openai_tokens_param(model: str) -> str:
+    """Return the correct token-limit parameter name for an OpenAI model.
+
+    o1/o3/o4-series reasoning models reject 'max_tokens' and require
+    'max_completion_tokens' (https://platform.openai.com/docs/api-reference).
+    All other models accept either name; we keep 'max_tokens' for them to stay
+    compatible with OpenAI-compatible third-party endpoints that haven't added
+    'max_completion_tokens' yet.
+    """
+    import re
+
+    return "max_completion_tokens" if re.match(r"^o[0-9]", model) else "max_tokens"
+
+
 def _openai_tool_schema(tool: Any) -> dict[str, Any]:
     return {
         "type": "function",
@@ -235,7 +249,7 @@ class OpenAIAgentClient:
 
         kwargs: dict[str, Any] = {
             "model": self._model,
-            "max_tokens": self._max_tokens,
+            _openai_tokens_param(self._model): self._max_tokens,
             "messages": msgs,
         }
         if tools:
