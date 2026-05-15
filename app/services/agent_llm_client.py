@@ -199,6 +199,12 @@ class BedrockAgentClient(AnthropicAgentClient):
 
 def _openai_max_token_kwarg(model: str) -> str:
     # OpenAI o-series reasoning models (o1, o3, o4-mini, …) reject max_tokens.
+    # This is a naming-convention heuristic and only matches bare o-series
+    # model names. Non-bare aliases such as vendor-prefixed routes
+    # (e.g. ``openai/o4-mini``, ``azure/o3``) or custom deployment names
+    # (e.g. ``my-o1-deployment``) are out of scope and will fall back to
+    # ``max_tokens``; if you use such aliases, set the model name to the
+    # bare o-series identifier or extend this helper.
     return (
         "max_completion_tokens"
         if len(model) > 1 and model[0] == "o" and model[1].isdigit()
