@@ -37,8 +37,9 @@ class AgentLLMResponse:
     content: str
     tool_calls: list[ToolCall] = field(default_factory=list)
     stop_reason: str = "end_turn"
-    # Raw Anthropic content blocks — used to build the next assistant message
-    # for providers that require full content-block history (Anthropic).
+    # Raw provider message data for the next assistant turn.
+    # Anthropic: list of content blocks. OpenAI: dict with role/content/tool_calls
+    # (preserves model_extra fields such as Gemini's thought_signature).
     raw_content: Any = None
 
     @property
@@ -280,7 +281,8 @@ class OpenAIAgentClient:
                 tool_calls.append(ToolCall(id=tc.id, name=tc.function.name, input=input_dict))
                 func_dict: dict[str, Any] = {
                     "name": tc.function.name,
-                    "arguments": tc.function.arguments,
+                    # Use normalized JSON to avoid forwarding malformed argument strings
+                    "arguments": json.dumps(input_dict),
                 }
                 # Preserve provider-specific function-level extras (e.g. Gemini thought_signature)
                 func_extra = getattr(tc.function, "model_extra", None) or {}
@@ -290,7 +292,8 @@ class OpenAIAgentClient:
                 tc_extra = getattr(tc, "model_extra", None) or {}
                 tc_dict.update(tc_extra)
                 raw_tc_list.append(tc_dict)
-            raw_msg = {"role": "assistant", "content": content, "tool_calls": raw_tc_list}
+            # Use msg.content (may be None) to preserve null vs empty-string distinction
+            raw_msg = {"role": "assistant", "content": msg.content, "tool_calls": raw_tc_list}
 
         return AgentLLMResponse(
             content=content,
