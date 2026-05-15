@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any, cast
 
 from app.tools.tool_decorator import tool
-from app.tools.utils.availability import hermes_available_or_backend
 
 
 def _extract_params(sources: dict[str, dict]) -> dict[str, Any]:
@@ -29,6 +28,11 @@ def _backend_or_error(hermes_backend: Any, tool_name: str) -> Any:
     return hermes_backend
 
 
+def _fixture_backend_only(sources: dict[str, Any]) -> bool:
+    hermes = sources.get("hermes")
+    return isinstance(hermes, dict) and hermes.get("_backend") is not None
+
+
 @tool(
     name="get_hermes_session_log",
     source="hermes",
@@ -40,7 +44,7 @@ def _backend_or_error(hermes_backend: Any, tool_name: str) -> Any:
         "properties": {"session_id": {"type": "string"}},
         "required": [],
     },
-    is_available=hermes_available_or_backend,
+    is_available=_fixture_backend_only,
     extract_params=_extract_params,
 )
 def get_hermes_session_log(
@@ -65,7 +69,7 @@ def get_hermes_session_log(
         "properties": {"session_id": {"type": "string"}},
         "required": [],
     },
-    is_available=hermes_available_or_backend,
+    is_available=_fixture_backend_only,
     extract_params=_extract_params,
 )
 def get_hermes_message_history(
@@ -90,7 +94,7 @@ def get_hermes_message_history(
         "properties": {"session_id": {"type": "string"}},
         "required": [],
     },
-    is_available=hermes_available_or_backend,
+    is_available=_fixture_backend_only,
     extract_params=_extract_params,
 )
 def get_hermes_kv_cache_state(
@@ -115,7 +119,7 @@ def get_hermes_kv_cache_state(
         "properties": {"session_id": {"type": "string"}},
         "required": [],
     },
-    is_available=hermes_available_or_backend,
+    is_available=_fixture_backend_only,
     extract_params=_extract_params,
 )
 def get_hermes_runtime_state(
@@ -140,7 +144,7 @@ def get_hermes_runtime_state(
         "properties": {"session_id": {"type": "string"}},
         "required": [],
     },
-    is_available=hermes_available_or_backend,
+    is_available=_fixture_backend_only,
     extract_params=_extract_params,
 )
 def get_hermes_cron_state(
@@ -165,7 +169,7 @@ def get_hermes_cron_state(
         "properties": {"session_id": {"type": "string"}},
         "required": [],
     },
-    is_available=hermes_available_or_backend,
+    is_available=_fixture_backend_only,
     extract_params=_extract_params,
 )
 def get_hermes_session_topology(
