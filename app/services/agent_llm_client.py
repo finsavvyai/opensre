@@ -269,19 +269,34 @@ class OpenAIAgentClient:
         stop_reason = choice.finish_reason or "stop"
 
         tool_calls: list[ToolCall] = []
+        raw_msg: dict[str, Any] | None = None
         if msg.tool_calls:
+            raw_tc_list: list[dict[str, Any]] = []
             for tc in msg.tool_calls:
                 try:
                     input_dict = json.loads(tc.function.arguments)
                 except json.JSONDecodeError:
                     input_dict = {}
                 tool_calls.append(ToolCall(id=tc.id, name=tc.function.name, input=input_dict))
+                func_dict: dict[str, Any] = {
+                    "name": tc.function.name,
+                    "arguments": tc.function.arguments,
+                }
+                # Preserve provider-specific function-level extras (e.g. Gemini thought_signature)
+                func_extra = getattr(tc.function, "model_extra", None) or {}
+                func_dict.update(func_extra)
+                tc_dict: dict[str, Any] = {"id": tc.id, "type": "function", "function": func_dict}
+                # Preserve provider-specific tool-call-level extras
+                tc_extra = getattr(tc, "model_extra", None) or {}
+                tc_dict.update(tc_extra)
+                raw_tc_list.append(tc_dict)
+            raw_msg = {"role": "assistant", "content": content, "tool_calls": raw_tc_list}
 
         return AgentLLMResponse(
             content=content,
             tool_calls=tool_calls,
             stop_reason=stop_reason,
-            raw_content=None,
+            raw_content=raw_msg,
         )
 
     @staticmethod
