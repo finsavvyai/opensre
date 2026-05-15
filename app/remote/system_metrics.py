@@ -124,10 +124,10 @@ def _memory_linux() -> dict[str, Any] | None:
 
 def _memory_darwin() -> dict[str, Any] | None:
     total_bytes = int(
-        subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True, encoding="utf-8").strip()
+        subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True, encoding="utf-8", errors="replace").strip()
     )
     user_bytes = int(
-        subprocess.check_output(["sysctl", "-n", "hw.usermem"], text=True, encoding="utf-8").strip()
+        subprocess.check_output(["sysctl", "-n", "hw.usermem"], text=True, encoding="utf-8", errors="replace").strip()
     )
     total_gb = round(total_bytes / (1024**3), 1)
     available_gb = round(user_bytes / (1024**3), 1)
@@ -186,7 +186,7 @@ def _uptime_linux() -> dict[str, Any] | None:
 
 def _uptime_darwin() -> dict[str, Any] | None:
     raw = subprocess.check_output(
-        ["sysctl", "-n", "kern.boottime"], text=True, encoding="utf-8"
+        ["sysctl", "-n", "kern.boottime"], text=True, encoding="utf-8", errors="replace"
     ).strip()
     # Format: "{ sec = 1712345678, usec = 123456 } ..."
     sec_part = raw.split("sec =")[1].split(",")[0].strip()
