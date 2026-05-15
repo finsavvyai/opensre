@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from tests.synthetic.hermes_rca.hermes_schemas import (
     VALID_HERMES_EVIDENCE_SOURCES,
     VALID_HERMES_FAILURE_MODES,
+    validate_hermes_answer_key,
 )
+from tests.synthetic.hermes_rca.run_suite import score_result
 from tests.synthetic.hermes_rca.scenario_loader import SUITE_DIR, load_all_scenarios
 from tests.synthetic.mock_hermes_backend.backend import FixtureHermesBackend
 
@@ -69,3 +73,41 @@ def test_fixture_backend_delivery_hang_shape() -> None:
 
     assert cron_state["available"] is True
     assert cron_state["last_run"]["delivery_status"] == "never_started"
+
+
+def test_answer_key_category_must_be_valid_taxonomy_value() -> None:
+    with pytest.raises(ValueError, match="unknown root_cause_category"):
+        validate_hermes_answer_key(
+            {
+                "root_cause_category": "not_a_real_category",
+                "required_keywords": ["x"],
+                "model_response": "y",
+            }
+        )
+
+
+def test_forbidden_category_check_precedes_wrong_category_reason() -> None:
+    fixture = next(
+        scenario
+        for scenario in load_all_scenarios(SUITE_DIR)
+        if scenario.scenario_id == "012-cron-hang-post-output"
+    )
+    fixture = replace(
+        fixture,
+        answer_key=replace(
+            fixture.answer_key,
+            forbidden_categories=["agent_hang"],
+        ),
+    )
+    score = score_result(
+        fixture,
+        {
+            "root_cause_category": "agent_hang",
+            "root_cause": "",
+            "report": "",
+            "problem_md": "",
+            "validated_claims": [],
+        },
+    )
+    assert score.passed is False
+    assert score.failure_reason == "forbidden category emitted: agent_hang"

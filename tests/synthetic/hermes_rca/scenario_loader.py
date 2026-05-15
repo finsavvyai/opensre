@@ -56,6 +56,13 @@ class HermesScenarioFixture:
     metadata: HermesScenarioMetadata
     answer_key: HermesScenarioAnswerKey
 
+    def session_id(self) -> str:
+        if self.evidence.hermes_session_log is not None:
+            return str(self.evidence.hermes_session_log.get("session_id", ""))
+        if self.evidence.hermes_message_history is not None:
+            return str(self.evidence.hermes_message_history.get("session_id", ""))
+        return ""
+
 
 def _read_json(path: Path) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))

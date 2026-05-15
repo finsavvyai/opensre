@@ -30,11 +30,7 @@ def _build_annotations(scenario_id: str, scenario_alert: dict[str, Any]) -> dict
 def run_hermes_scenario(scenario_id: str) -> dict[str, Any]:
     fixture = load_scenario(SUITE_DIR / scenario_id)
 
-    session_id = ""
-    if fixture.evidence.hermes_session_log is not None:
-        session_id = str(fixture.evidence.hermes_session_log.get("session_id", ""))
-    elif fixture.evidence.hermes_message_history is not None:
-        session_id = str(fixture.evidence.hermes_message_history.get("session_id", ""))
+    session_id = fixture.session_id()
 
     raw_alert = create_alert(
         pipeline_name="hermes-long-running-e2e",

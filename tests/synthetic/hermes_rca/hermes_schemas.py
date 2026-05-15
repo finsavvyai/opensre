@@ -7,6 +7,8 @@ from typing import Any, NotRequired
 
 from typing_extensions import TypedDict
 
+from app.types.root_cause_categories import VALID_ROOT_CAUSE_CATEGORIES
+
 VALID_HERMES_FAILURE_MODES = frozenset(
     {
         "healthy",
@@ -327,6 +329,12 @@ def validate_hermes_session_topology(data: dict[str, Any]) -> HermesSessionTopol
 def validate_hermes_answer_key(data: dict[str, Any]) -> HermesScenarioAnswerKeySchema:
     ctx = "answer.yml"
     _require_str(data, "root_cause_category", ctx)
+    root_cause_category = str(data["root_cause_category"]).strip()
+    if root_cause_category not in VALID_ROOT_CAUSE_CATEGORIES:
+        raise ValueError(
+            f"{ctx}: unknown root_cause_category {root_cause_category!r}; "
+            f"expected one of {sorted(VALID_ROOT_CAUSE_CATEGORIES)}"
+        )
     _require_non_empty_str_list(data, "required_keywords", ctx, required=True)
     _require_str(data, "model_response", ctx)
 

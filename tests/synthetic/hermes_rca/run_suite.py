@@ -54,16 +54,6 @@ def score_result(fixture: HermesScenarioFixture, final_state: dict[str, Any]) ->
     forbidden = {item.strip().lower() for item in fixture.answer_key.forbidden_categories}
     category_forbidden = actual_category in forbidden
 
-    if actual_category != expected_category:
-        return ScenarioScore(
-            scenario_id=fixture.scenario_id,
-            passed=False,
-            expected_category=expected_category,
-            actual_category=actual_category,
-            missing_keywords=missing_keywords,
-            failure_reason=f"wrong category: expected {expected_category}, got {actual_category}",
-        )
-
     if category_forbidden:
         return ScenarioScore(
             scenario_id=fixture.scenario_id,
@@ -72,6 +62,16 @@ def score_result(fixture: HermesScenarioFixture, final_state: dict[str, Any]) ->
             actual_category=actual_category,
             missing_keywords=missing_keywords,
             failure_reason=f"forbidden category emitted: {actual_category}",
+        )
+
+    if actual_category != expected_category:
+        return ScenarioScore(
+            scenario_id=fixture.scenario_id,
+            passed=False,
+            expected_category=expected_category,
+            actual_category=actual_category,
+            missing_keywords=missing_keywords,
+            failure_reason=f"wrong category: expected {expected_category}, got {actual_category}",
         )
 
     if missing_keywords:
@@ -95,11 +95,7 @@ def score_result(fixture: HermesScenarioFixture, final_state: dict[str, Any]) ->
 
 def _build_resolved_integrations(fixture: HermesScenarioFixture) -> dict[str, Any]:
     backend = FixtureHermesBackend(fixture)
-    session_id = ""
-    if fixture.evidence.hermes_session_log is not None:
-        session_id = str(fixture.evidence.hermes_session_log.get("session_id", ""))
-    elif fixture.evidence.hermes_message_history is not None:
-        session_id = str(fixture.evidence.hermes_message_history.get("session_id", ""))
+    session_id = fixture.session_id()
 
     return {
         "hermes": {
