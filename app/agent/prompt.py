@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.types.root_cause_categories import render_prompt_taxonomy
+
 _INVESTIGATION_SYSTEM = """You are Tracer, an AI SRE performing a live production incident investigation.
 
 Your task: investigate the alert below and produce a clear, evidence-backed root cause analysis.
@@ -28,12 +30,15 @@ Your task: investigate the alert below and produce a clear, evidence-backed root
 
 When you are done investigating (no more tool calls), write a diagnosis that includes:
 - **Root cause**: What failed and why (2-3 sentences, specific)
-- **Root cause category**: One of database / infrastructure / code_bug / configuration / network / performance / healthy / unknown
+- **Root cause category**: Use exactly one category name from the taxonomy below
 - **Evidence**: Which tool results support your conclusion
 - **Validated claims**: Specific facts confirmed by evidence (e.g. "Error rate spiked to 47% at 14:32 UTC per Grafana logs")
 - **Non-validated claims**: Hypotheses you could not confirm
 - **Remediation steps**: Ordered, concrete actions to fix the issue
 - **Validity score**: 0.0–1.0 reflecting your confidence based on evidence quality
+
+## Root cause category taxonomy (single source of truth)
+{root_cause_taxonomy}
 """
 
 _ALERT_CONTEXT_TEMPLATE = """## Alert
@@ -94,7 +99,7 @@ _SECONDARY_SOURCES = {"knowledge", "openclaw", "google_docs"}
 
 
 def build_system_prompt(_state: dict[str, Any]) -> str:
-    return _INVESTIGATION_SYSTEM
+    return _INVESTIGATION_SYSTEM.format(root_cause_taxonomy=render_prompt_taxonomy().strip())
 
 
 def format_alert_context(state: dict[str, Any]) -> str:

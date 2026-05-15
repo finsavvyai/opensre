@@ -8,6 +8,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.types.root_cause_categories import render_prompt_taxonomy
+
 logger = logging.getLogger(__name__)
 
 
@@ -15,8 +17,7 @@ class _DiagnosisSchema(BaseModel):
     root_cause: str = Field(description="Concise root cause statement (2-3 sentences max)")
     root_cause_category: str = Field(
         description=(
-            "One of: database, infrastructure, code_bug, configuration, "
-            "network, performance, healthy, unknown"
+            f"Use exactly one category from this taxonomy:\n{render_prompt_taxonomy().strip()}"
         )
     )
     causal_chain: list[str] = Field(
