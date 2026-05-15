@@ -24,6 +24,7 @@ class ScenarioScore:
     expected_category: str
     actual_category: str
     missing_keywords: list[str]
+    forbidden_keywords_present: list[str]
     failure_reason: str = ""
 
 
@@ -50,6 +51,9 @@ def score_result(fixture: HermesScenarioFixture, final_state: dict[str, Any]) ->
     missing_keywords = [
         kw for kw in fixture.answer_key.required_keywords if _normalized(kw) not in output
     ]
+    forbidden_keywords_present = [
+        kw for kw in fixture.answer_key.forbidden_keywords if _normalized(kw) in output
+    ]
 
     forbidden = {item.strip().lower() for item in fixture.answer_key.forbidden_categories}
     category_forbidden = actual_category in forbidden
@@ -61,6 +65,7 @@ def score_result(fixture: HermesScenarioFixture, final_state: dict[str, Any]) ->
             expected_category=expected_category,
             actual_category=actual_category,
             missing_keywords=missing_keywords,
+            forbidden_keywords_present=forbidden_keywords_present,
             failure_reason=f"forbidden category emitted: {actual_category}",
         )
 
@@ -71,7 +76,19 @@ def score_result(fixture: HermesScenarioFixture, final_state: dict[str, Any]) ->
             expected_category=expected_category,
             actual_category=actual_category,
             missing_keywords=missing_keywords,
+            forbidden_keywords_present=forbidden_keywords_present,
             failure_reason=f"wrong category: expected {expected_category}, got {actual_category}",
+        )
+
+    if forbidden_keywords_present:
+        return ScenarioScore(
+            scenario_id=fixture.scenario_id,
+            passed=False,
+            expected_category=expected_category,
+            actual_category=actual_category,
+            missing_keywords=missing_keywords,
+            forbidden_keywords_present=forbidden_keywords_present,
+            failure_reason=f"forbidden keywords present: {forbidden_keywords_present}",
         )
 
     if missing_keywords:
@@ -81,6 +98,7 @@ def score_result(fixture: HermesScenarioFixture, final_state: dict[str, Any]) ->
             expected_category=expected_category,
             actual_category=actual_category,
             missing_keywords=missing_keywords,
+            forbidden_keywords_present=forbidden_keywords_present,
             failure_reason=f"missing required keywords: {missing_keywords}",
         )
 
@@ -90,6 +108,7 @@ def score_result(fixture: HermesScenarioFixture, final_state: dict[str, Any]) ->
         expected_category=expected_category,
         actual_category=actual_category,
         missing_keywords=[],
+        forbidden_keywords_present=[],
     )
 
 
@@ -178,6 +197,7 @@ def main(argv: list[str] | None = None) -> int:
                     "expected_category": score.expected_category,
                     "actual_category": score.actual_category,
                     "missing_keywords": score.missing_keywords,
+                    "forbidden_keywords_present": score.forbidden_keywords_present,
                     "failure_reason": score.failure_reason,
                     "validity_score": final_state.get("validity_score"),
                 }

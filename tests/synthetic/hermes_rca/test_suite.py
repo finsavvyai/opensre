@@ -86,6 +86,18 @@ def test_answer_key_category_must_be_valid_taxonomy_value() -> None:
         )
 
 
+def test_answer_key_rejects_conflicting_forbidden_category() -> None:
+    with pytest.raises(ValueError, match="cannot also appear"):
+        validate_hermes_answer_key(
+            {
+                "root_cause_category": "agent_hang",
+                "required_keywords": ["x"],
+                "model_response": "y",
+                "forbidden_categories": ["agent_hang"],
+            }
+        )
+
+
 def test_forbidden_category_check_precedes_wrong_category_reason() -> None:
     fixture = next(
         scenario
@@ -111,3 +123,30 @@ def test_forbidden_category_check_precedes_wrong_category_reason() -> None:
     )
     assert score.passed is False
     assert score.failure_reason == "forbidden category emitted: agent_hang"
+
+
+def test_forbidden_keywords_fail_score() -> None:
+    fixture = next(
+        scenario
+        for scenario in load_all_scenarios(SUITE_DIR)
+        if scenario.scenario_id == "000-healthy"
+    )
+    fixture = replace(
+        fixture,
+        answer_key=replace(
+            fixture.answer_key,
+            forbidden_keywords=["panic"],
+        ),
+    )
+    score = score_result(
+        fixture,
+        {
+            "root_cause_category": "healthy",
+            "root_cause": "service panic observed",
+            "report": "",
+            "problem_md": "",
+            "validated_claims": [],
+        },
+    )
+    assert score.passed is False
+    assert score.forbidden_keywords_present == ["panic"]

@@ -350,6 +350,17 @@ def validate_hermes_answer_key(data: dict[str, Any]) -> HermesScenarioAnswerKeyS
         if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
             raise ValueError(f"{ctx}: '{field}' must be a list of strings")
 
+    forbidden_categories = {
+        item.strip()
+        for item in (data.get("forbidden_categories") or [])
+        if isinstance(item, str) and item.strip()
+    }
+    if root_cause_category in forbidden_categories:
+        raise ValueError(
+            f"{ctx}: root_cause_category {root_cause_category!r} cannot also appear in "
+            "'forbidden_categories'"
+        )
+
     trajectory = data.get("optimal_trajectory")
     if isinstance(trajectory, list):
         unknown_actions = [
