@@ -502,8 +502,9 @@ def _build_assistant_msg(llm: Any, response: Any) -> dict[str, Any]:
     # Use raw_content when set — preserves provider-specific fields such as
     # Gemini's thought_signature that must be echoed back in the next request.
     if response.raw_content is not None:
-        return response.raw_content  # type: ignore[return-value]
-    return llm.build_assistant_message(response.content, response.tool_calls)
+        return response.raw_content  # type: ignore[no-any-return]
+    result: dict[str, Any] = llm.build_assistant_message(response.content, response.tool_calls)
+    return result
 
 
 def _build_tool_result_messages(
