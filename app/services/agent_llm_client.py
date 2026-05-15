@@ -197,6 +197,15 @@ class BedrockAgentClient(AnthropicAgentClient):
         super().__init__(model=model, max_tokens=max_tokens, client=bedrock_client)
 
 
+def _openai_max_token_kwarg(model: str) -> str:
+    # OpenAI o-series reasoning models (o1, o3, o4-mini, …) reject max_tokens.
+    return (
+        "max_completion_tokens"
+        if len(model) > 1 and model[0] == "o" and model[1].isdigit()
+        else "max_tokens"
+    )
+
+
 class OpenAIAgentClient:
     """OpenAI-compatible client with tool-calling for the agent loop."""
 
@@ -235,7 +244,7 @@ class OpenAIAgentClient:
 
         kwargs: dict[str, Any] = {
             "model": self._model,
-            "max_tokens": self._max_tokens,
+            _openai_max_token_kwarg(self._model): self._max_tokens,
             "messages": msgs,
         }
         if tools:

@@ -205,3 +205,57 @@ def test_openai_agent_client_invoke_raw_content_preserves_extra_fields(
     assert isinstance(response.raw_content.get("tool_calls"), list)
     first_tc = response.raw_content["tool_calls"][0]
     assert first_tc.get("thought_signature") == "abc123"
+
+
+def test_openai_o_series_uses_max_completion_tokens(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """o-series reasoning models must receive max_completion_tokens, not max_tokens."""
+    _install_fake_openai(monkeypatch)
+
+    captured: dict = {}
+
+    def capture_create(**kwargs: object) -> object:
+        captured.update(kwargs)
+        return _make_fake_openai_response(content="ok")
+
+    client = OpenAIAgentClient.__new__(OpenAIAgentClient)
+    client._client = types.SimpleNamespace(
+        chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=capture_create))
+    )
+    client._max_tokens = 4096
+
+    for model in ("o1", "o1-mini", "o3", "o3-mini", "o4-mini"):
+        captured.clear()
+        client._model = model
+        client.invoke(messages=[{"role": "user", "content": "hi"}])
+        assert "max_completion_tokens" in captured, f"{model} should use max_completion_tokens"
+        assert "max_tokens" not in captured, f"{model} must not send max_tokens"
+
+
+def test_openai_standard_models_use_max_tokens(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Non-o-series models must still receive max_tokens."""
+    _install_fake_openai(monkeypatch)
+
+    captured: dict = {}
+
+    def capture_create(**kwargs: object) -> object:
+        captured.update(kwargs)
+        return _make_fake_openai_response(content="ok")
+
+    client = OpenAIAgentClient.__new__(OpenAIAgentClient)
+    client._client = types.SimpleNamespace(
+        chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=capture_create))
+    )
+    client._max_tokens = 4096
+
+    for model in ("gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gemini-2.5-flash"):
+        captured.clear()
+        client._model = model
+        client.invoke(messages=[{"role": "user", "content": "hi"}])
+        assert "max_tokens" in captured, f"{model} should use max_tokens"
+        assert "max_completion_tokens" not in captured, (
+            f"{model} must not send max_completion_tokens"
+        )
