@@ -11,17 +11,23 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class HermesBackend(Protocol):
-    def get_session_log(self, session_id: str = "", **kwargs: Any) -> dict[str, Any]: ...
+    def get_session_log(self, session_id: str = "", **kwargs: Any) -> dict[str, Any]:
+        pass
 
-    def get_message_history(self, session_id: str = "", **kwargs: Any) -> dict[str, Any]: ...
+    def get_message_history(self, session_id: str = "", **kwargs: Any) -> dict[str, Any]:
+        pass
 
-    def get_kv_cache_state(self, session_id: str = "", **kwargs: Any) -> dict[str, Any]: ...
+    def get_kv_cache_state(self, session_id: str = "", **kwargs: Any) -> dict[str, Any]:
+        pass
 
-    def get_runtime_state(self, session_id: str = "", **kwargs: Any) -> dict[str, Any]: ...
+    def get_runtime_state(self, session_id: str = "", **kwargs: Any) -> dict[str, Any]:
+        pass
 
-    def get_cron_state(self, session_id: str = "", **kwargs: Any) -> dict[str, Any]: ...
+    def get_cron_state(self, session_id: str = "", **kwargs: Any) -> dict[str, Any]:
+        pass
 
-    def get_session_topology(self, session_id: str = "", **kwargs: Any) -> dict[str, Any]: ...
+    def get_session_topology(self, session_id: str = "", **kwargs: Any) -> dict[str, Any]:
+        pass
 
 
 class FixtureHermesBackend:
