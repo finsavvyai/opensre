@@ -5,8 +5,21 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import click
+
 from app.cli.wizard.config import PROJECT_ENV_PATH, ProviderOption
 from app.llm_credentials import has_llm_api_key
+
+
+def _write_env_file(path: Path, content: str) -> None:
+    try:
+        path.write_text(content, encoding="utf-8")
+    except PermissionError:
+        raise click.ClickException(
+            f"Cannot write to {path}: permission denied.\n"
+            f"  Fix with: sudo chown $USER {path}  or  chmod 644 {path}"
+        ) from None
+
 
 _ENV_ASSIGNMENT = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=")
 
@@ -44,22 +57,16 @@ def sync_env_values(
             else []
         )
     except PermissionError as err:
-        raise RuntimeError(
-            f"Permission denied reading '{target_path}'. "
-            f"Check file ownership and permissions: ls -la {target_path.parent}"
+        raise click.ClickException(
+            f"Cannot read {target_path}: permission denied.\n"
+            f"  Fix with: sudo chown $USER {target_path}  or  chmod 644 {target_path}"
         ) from err
 
     lines = existing
     for key, value in values.items():
         lines = _set_env_value(lines, key, value)
 
-    try:
-        target_path.write_text("".join(lines), encoding="utf-8")
-    except PermissionError as err:
-        raise RuntimeError(
-            f"Permission denied writing to '{target_path}'. "
-            f"Check file ownership and permissions: ls -la {target_path.parent}"
-        ) from err
+    _write_env_file(target_path, "".join(lines))
     return target_path
 
 
@@ -116,9 +123,9 @@ def sync_provider_env(
             else []
         )
     except PermissionError as err:
-        raise RuntimeError(
-            f"Permission denied reading '{target_path}'. "
-            f"Check file ownership and permissions: ls -la {target_path.parent}"
+        raise click.ClickException(
+            f"Cannot read {target_path}: permission denied.\n"
+            f"  Fix with: sudo chown $USER {target_path}  or  chmod 644 {target_path}"
         ) from err
 
     # Strip every provider's API key and every provider's model keys except the
@@ -152,11 +159,5 @@ def sync_provider_env(
     for key, value in values.items():
         lines = _set_env_value(lines, key, value)
 
-    try:
-        target_path.write_text("".join(lines), encoding="utf-8")
-    except PermissionError as err:
-        raise RuntimeError(
-            f"Permission denied writing to '{target_path}'. "
-            f"Check file ownership and permissions: ls -la {target_path.parent}"
-        ) from err
+    _write_env_file(target_path, "".join(lines))
     return target_path
