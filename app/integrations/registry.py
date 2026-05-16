@@ -132,6 +132,13 @@ INTEGRATION_SPECS: tuple[IntegrationSpec, ...] = (
         verify_order=None,
     ),
     IntegrationSpec(
+        service="pipewarden",
+        verifier=None,
+        direct_effective=True,
+        setup_order=15,
+        verify_order=None,
+    ),
+    IntegrationSpec(
         service="mongodb",
         aliases=("mongo",),
         verifier=_verify_mongodb,
