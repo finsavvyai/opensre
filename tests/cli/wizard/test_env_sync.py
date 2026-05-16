@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from app.cli.wizard.config import PROVIDER_BY_VALUE
-from app.cli.wizard.env_sync import sync_provider_env
+from app.cli.wizard.env_sync import sync_env_values, sync_provider_env
 
 
 def test_sync_provider_env_updates_provider_specific_keys(tmp_path) -> None:
@@ -76,3 +78,27 @@ def test_sync_provider_env_gemini_cli_writes_model(tmp_path) -> None:
     content = env_path.read_text(encoding="utf-8")
     assert "LLM_PROVIDER=gemini-cli\n" in content
     assert "GEMINI_CLI_MODEL=\n" in content
+
+
+def test_sync_provider_env_permission_denied_raises_runtime_error(tmp_path) -> None:
+    from unittest.mock import patch
+
+    env_path = tmp_path / ".env"
+    env_path.write_text("LLM_PROVIDER=anthropic\n", encoding="utf-8")
+    with patch("pathlib.Path.write_text", side_effect=PermissionError("Permission denied")):
+        with pytest.raises(RuntimeError, match="Permission denied writing to"):
+            sync_provider_env(
+                provider=PROVIDER_BY_VALUE["openai"],
+                model="gpt-4o",
+                env_path=env_path,
+            )
+
+
+def test_sync_env_values_permission_denied_raises_runtime_error(tmp_path) -> None:
+    from unittest.mock import patch
+
+    env_path = tmp_path / ".env"
+    env_path.write_text("KEY=value\n", encoding="utf-8")
+    with patch("pathlib.Path.write_text", side_effect=PermissionError("Permission denied")):
+        with pytest.raises(RuntimeError, match="Permission denied writing to"):
+            sync_env_values({"KEY": "new_value"}, env_path=env_path)
