@@ -22,6 +22,12 @@ def _install_fake_anthropic(monkeypatch: pytest.MonkeyPatch) -> types.SimpleName
     class NotFoundError(Exception):
         pass
 
+    class RateLimitError(Exception):
+        pass
+
+    class PermissionDeniedError(Exception):
+        pass
+
     class Anthropic:
         def __init__(self, **_: object) -> None:
             self.messages = types.SimpleNamespace(create=lambda **_: None)
@@ -33,6 +39,8 @@ def _install_fake_anthropic(monkeypatch: pytest.MonkeyPatch) -> types.SimpleName
     fake_module.AuthenticationError = AuthenticationError
     fake_module.BadRequestError = BadRequestError
     fake_module.NotFoundError = NotFoundError
+    fake_module.RateLimitError = RateLimitError
+    fake_module.PermissionDeniedError = PermissionDeniedError
     fake_module.Anthropic = Anthropic
     fake_module.AnthropicBedrock = AnthropicBedrock
     monkeypatch.setitem(sys.modules, "anthropic", fake_module)
@@ -81,6 +89,12 @@ def _install_fake_openai(monkeypatch: pytest.MonkeyPatch) -> types.SimpleNamespa
     class NotFoundError(Exception):
         pass
 
+    class RateLimitError(Exception):
+        pass
+
+    class PermissionDeniedError(Exception):
+        pass
+
     class OpenAI:
         def __init__(self, **_: object) -> None:
             self.chat = types.SimpleNamespace(
@@ -90,6 +104,8 @@ def _install_fake_openai(monkeypatch: pytest.MonkeyPatch) -> types.SimpleNamespa
     fake_module.AuthenticationError = AuthenticationError
     fake_module.BadRequestError = BadRequestError
     fake_module.NotFoundError = NotFoundError
+    fake_module.RateLimitError = RateLimitError
+    fake_module.PermissionDeniedError = PermissionDeniedError
     fake_module.OpenAI = OpenAI
     monkeypatch.setitem(sys.modules, "openai", fake_module)
     return fake_module

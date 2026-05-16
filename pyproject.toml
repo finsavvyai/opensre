@@ -154,6 +154,7 @@ ignore_names = [
 # `pre-commit` is also under `[project.optional-dependencies] dev` for `pip install .[dev]`.
 [dependency-groups]
 dev = [
+    "mypy>=1.20.2",
     "pre-commit>=4.0.0",
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",

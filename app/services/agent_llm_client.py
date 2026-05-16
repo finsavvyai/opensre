@@ -95,7 +95,13 @@ class AnthropicAgentClient:
         system: str | None = None,
         tools: list[dict[str, Any]] | None = None,
     ) -> AgentLLMResponse:
-        from anthropic import AuthenticationError, BadRequestError, NotFoundError
+        from anthropic import (
+            AuthenticationError,
+            BadRequestError,
+            NotFoundError,
+            PermissionDeniedError,
+            RateLimitError,
+        )
 
         kwargs: dict[str, Any] = {
             "model": self._model,
@@ -121,6 +127,10 @@ class AnthropicAgentClient:
                 raise RuntimeError(
                     f"{self.provider_name} request rejected (HTTP 400): {err.message}"
                 ) from err
+            except RateLimitError as err:
+                raise RuntimeError(f"{self.provider_name} rate limit exceeded: {err}") from err
+            except PermissionDeniedError as err:
+                raise RuntimeError(f"{self.provider_name} request forbidden: {err}") from err
             except Exception as err:
                 last_err = err
                 if attempt == _RETRY_MAX_ATTEMPTS - 1:
@@ -228,7 +238,13 @@ class OpenAIAgentClient:
         system: str | None = None,
         tools: list[dict[str, Any]] | None = None,
     ) -> AgentLLMResponse:
-        from openai import AuthenticationError, BadRequestError, NotFoundError
+        from openai import (
+            AuthenticationError,
+            BadRequestError,
+            NotFoundError,
+            PermissionDeniedError,
+            RateLimitError,
+        )
 
         msgs = list(messages)
         if system:
@@ -258,6 +274,10 @@ class OpenAIAgentClient:
                 raise RuntimeError(f"OpenAI model '{self._model}' not found.") from err
             except BadRequestError as err:
                 raise RuntimeError(f"OpenAI request rejected: {err}") from err
+            except RateLimitError as err:
+                raise RuntimeError(f"OpenAI rate limit exceeded: {err}") from err
+            except PermissionDeniedError as err:
+                raise RuntimeError(f"OpenAI request forbidden: {err}") from err
             except Exception as err:
                 last_err = err
                 if attempt == _RETRY_MAX_ATTEMPTS - 1:
