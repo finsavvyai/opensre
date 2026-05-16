@@ -357,18 +357,26 @@ class SigNozClient:
         try:
             result = client.query(query, parameters=params)
             row = result.first_row if result.row_count > 0 else (0, 0, 0.0, 0.0, 0.0, 0.0)
-            total = row[0] or 0
-            errors = row[1] or 0
+            total = int(row[0] or 0)
+            errors = int(row[1] or 0)
+
+            def _safe_float(value: Any, default: float = 0.0) -> float:
+                try:
+                    parsed = float(value)
+                    return parsed if parsed == parsed else default  # NaN check
+                except (TypeError, ValueError):
+                    return default
+
             return {
                 "source": "signoz_traces",
                 "available": True,
                 "total_spans": total,
                 "error_spans": errors,
                 "error_rate": round(errors / total, 4) if total else 0.0,
-                "p99_ms": row[2] or 0.0,
-                "p95_ms": row[3] or 0.0,
-                "avg_ms": row[4] or 0.0,
-                "max_ms": row[5] or 0.0,
+                "p99_ms": _safe_float(row[2]),
+                "p95_ms": _safe_float(row[3]),
+                "avg_ms": _safe_float(row[4]),
+                "max_ms": _safe_float(row[5]),
             }
         finally:
             client.close()
