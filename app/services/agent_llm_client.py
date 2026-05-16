@@ -38,8 +38,11 @@ class AgentLLMResponse:
     tool_calls: list[ToolCall] = field(default_factory=list)
     stop_reason: str = "end_turn"
     # Raw provider message data for the next assistant turn.
-    # Anthropic: list of content blocks. OpenAI: dict with role/content/tool_calls
-    # (preserves model_extra fields such as Gemini's thought_signature).
+    # Anthropic: list of content blocks (always populated).
+    # OpenAI-compatible: dict with role/content/tool_calls, populated only when
+    # provider-specific extras (e.g. Gemini's thought_signature) need to be
+    # preserved; otherwise None and the assistant message is reconstructed via
+    # build_assistant_message.
     raw_content: Any = None
 
     @property
@@ -273,6 +276,7 @@ class OpenAIAgentClient:
         raw_msg: dict[str, Any] | None = None
         if msg.tool_calls:
             raw_tc_list: list[dict[str, Any]] = []
+            has_provider_extras = False
             for tc in msg.tool_calls:
                 try:
                     input_dict = json.loads(tc.function.arguments)
@@ -286,14 +290,26 @@ class OpenAIAgentClient:
                 }
                 # Preserve provider-specific function-level extras (e.g. Gemini thought_signature)
                 func_extra = getattr(tc.function, "model_extra", None) or {}
+                if func_extra:
+                    has_provider_extras = True
                 func_dict.update(func_extra)
                 tc_dict: dict[str, Any] = {"id": tc.id, "type": "function", "function": func_dict}
                 # Preserve provider-specific tool-call-level extras
                 tc_extra = getattr(tc, "model_extra", None) or {}
+                if tc_extra:
+                    has_provider_extras = True
                 tc_dict.update(tc_extra)
                 raw_tc_list.append(tc_dict)
-            # Use msg.content (may be None) to preserve null vs empty-string distinction
-            raw_msg = {"role": "assistant", "content": msg.content, "tool_calls": raw_tc_list}
+            # Only retain raw_msg when provider-specific extras are present
+            # (e.g. Gemini's thought_signature). Otherwise leave raw_content=None
+            # so non-gemini providers go through build_assistant_message.
+            if has_provider_extras:
+                # Use msg.content (may be None) to preserve null vs empty-string distinction
+                raw_msg = {
+                    "role": "assistant",
+                    "content": msg.content,
+                    "tool_calls": raw_tc_list,
+                }
 
         return AgentLLMResponse(
             content=content,
