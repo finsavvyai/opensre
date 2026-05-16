@@ -263,3 +263,81 @@ def test_openai_agent_client_uses_correct_tokens_param(
     assert expected_key in captured, f"expected '{expected_key}' in kwargs for model {model!r}"
     other_key = "max_tokens" if expected_key == "max_completion_tokens" else "max_completion_tokens"
     assert other_key not in captured, f"unexpected '{other_key}' in kwargs for model {model!r}"
+
+
+def test_bedrock_rate_limit_error_raises_runtime_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_anthropic = _install_fake_anthropic(monkeypatch)
+    monkeypatch.setenv("AWS_REGION", "us-west-2")
+    client = BedrockAgentClient(model="us.anthropic.claude-sonnet-4-6")
+
+    def raise_rate_limit(**_: object) -> object:
+        raise fake_anthropic.RateLimitError("slow down")
+
+    client._client = types.SimpleNamespace(
+        messages=types.SimpleNamespace(create=raise_rate_limit)
+    )
+
+    with pytest.raises(RuntimeError, match="Bedrock rate limit exceeded"):
+        client.invoke(messages=[{"role": "user", "content": "hi"}])
+
+
+def test_bedrock_permission_denied_error_raises_runtime_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_anthropic = _install_fake_anthropic(monkeypatch)
+    monkeypatch.setenv("AWS_REGION", "us-west-2")
+    client = BedrockAgentClient(model="us.anthropic.claude-sonnet-4-6")
+
+    def raise_permission_denied(**_: object) -> object:
+        raise fake_anthropic.PermissionDeniedError("forbidden")
+
+    client._client = types.SimpleNamespace(
+        messages=types.SimpleNamespace(create=raise_permission_denied)
+    )
+
+    with pytest.raises(RuntimeError, match="Bedrock request forbidden"):
+        client.invoke(messages=[{"role": "user", "content": "hi"}])
+
+
+def test_openai_rate_limit_error_raises_runtime_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_openai = _install_fake_openai(monkeypatch)
+
+    def raise_rate_limit(**_: object) -> object:
+        raise fake_openai.RateLimitError("slow down")
+
+    client = OpenAIAgentClient.__new__(OpenAIAgentClient)
+    client._client = types.SimpleNamespace(
+        chat=types.SimpleNamespace(
+            completions=types.SimpleNamespace(create=raise_rate_limit)
+        )
+    )
+    client._model = "gpt-4o"
+    client._max_tokens = 512
+
+    with pytest.raises(RuntimeError, match="OpenAI rate limit exceeded"):
+        client.invoke(messages=[{"role": "user", "content": "hi"}])
+
+
+def test_openai_permission_denied_error_raises_runtime_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_openai = _install_fake_openai(monkeypatch)
+
+    def raise_permission_denied(**_: object) -> object:
+        raise fake_openai.PermissionDeniedError("forbidden")
+
+    client = OpenAIAgentClient.__new__(OpenAIAgentClient)
+    client._client = types.SimpleNamespace(
+        chat=types.SimpleNamespace(
+            completions=types.SimpleNamespace(create=raise_permission_denied)
+        )
+    )
+    client._model = "gpt-4o"
+    client._max_tokens = 512
+
+    with pytest.raises(RuntimeError, match="OpenAI request forbidden"):
+        client.invoke(messages=[{"role": "user", "content": "hi"}])
