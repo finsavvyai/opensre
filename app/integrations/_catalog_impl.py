@@ -36,12 +36,12 @@ from app.integrations.config_models import (
 from app.integrations.effective_models import EffectiveIntegrations
 from app.integrations.github_mcp import build_github_mcp_config
 from app.integrations.gitlab import DEFAULT_GITLAB_BASE_URL, build_gitlab_config
-from app.integrations.pipewarden import DEFAULT_PIPEWARDEN_BASE_URL, build_pipewarden_config
 from app.integrations.mariadb import build_mariadb_config
 from app.integrations.mongodb import build_mongodb_config
 from app.integrations.mongodb_atlas import build_mongodb_atlas_config
 from app.integrations.mysql import build_mysql_config
 from app.integrations.openclaw import build_openclaw_config
+from app.integrations.pipewarden import DEFAULT_PIPEWARDEN_BASE_URL, build_pipewarden_config
 from app.integrations.postgresql import build_postgresql_config
 from app.integrations.rabbitmq import build_rabbitmq_config
 from app.integrations.rds import (
