@@ -225,7 +225,16 @@ def test_openai_o_series_uses_max_completion_tokens(
     )
     client._max_tokens = 4096
 
-    for model in ("o1", "o1-mini", "o3", "o3-mini", "o4-mini"):
+    for model in (
+        "o1",
+        "o1-mini",
+        "o3",
+        "o3-mini",
+        "o4-mini",
+        "openai/o4-mini",
+        "azure/o3",
+        "my-o1-deployment",
+    ):
         captured.clear()
         client._model = model
         client.invoke(messages=[{"role": "user", "content": "hi"}])
