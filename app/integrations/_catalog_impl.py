@@ -36,6 +36,7 @@ from app.integrations.config_models import (
 from app.integrations.effective_models import EffectiveIntegrations
 from app.integrations.github_mcp import build_github_mcp_config
 from app.integrations.gitlab import DEFAULT_GITLAB_BASE_URL, build_gitlab_config
+from app.integrations.pipewarden import DEFAULT_PIPEWARDEN_BASE_URL, build_pipewarden_config
 from app.integrations.mariadb import build_mariadb_config
 from app.integrations.mongodb import build_mongodb_config
 from app.integrations.mongodb_atlas import build_mongodb_atlas_config
@@ -293,6 +294,18 @@ def _classify_service_instance(
         except Exception:
             return None, None
         return gitlab_config.model_dump(), "gitlab"
+
+    if key == "pipewarden":
+        try:
+            pipewarden_config = build_pipewarden_config(
+                {
+                    "base_url": credentials.get("base_url", ""),
+                    "api_key": credentials.get("api_key", ""),
+                }
+            )
+        except Exception:
+            return None, None
+        return pipewarden_config.model_dump(), "pipewarden"
 
     if key == "mongodb":
         try:
@@ -1104,6 +1117,17 @@ def load_env_integrations() -> list[dict[str, Any]]:
             }
         )
         integrations.append(_active_env_record("gitlab", gitlab_config.model_dump()))
+
+    pipewarden_api_key = os.getenv("PIPEWARDEN_API_KEY", "").strip()
+    pipewarden_base_url = os.getenv("PIPEWARDEN_BASE_URL", "").strip()
+    if pipewarden_api_key or pipewarden_base_url:
+        pipewarden_config = build_pipewarden_config(
+            {
+                "base_url": pipewarden_base_url or DEFAULT_PIPEWARDEN_BASE_URL,
+                "api_key": pipewarden_api_key,
+            }
+        )
+        integrations.append(_active_env_record("pipewarden", pipewarden_config.model_dump()))
 
     mongodb_connection_string = os.getenv("MONGODB_CONNECTION_STRING", "").strip()
     if mongodb_connection_string:

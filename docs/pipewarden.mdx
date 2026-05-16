@@ -1,0 +1,117 @@
+---
+title: "PipeWarden"
+---
+
+OpenSRE's PipeWarden integration gives the investigation agent read access to
+security findings and pipeline run history from your [PipeWarden](https://pipewarden.io)
+deployment. PipeWarden scans CI/CD pipelines across GitHub Actions, GitLab CI/CD,
+Bitbucket Pipelines, Jenkins, Azure DevOps, and CircleCI; OpenSRE can use those
+findings as evidence when investigating a pipeline incident.
+
+There is also an inbound bridge: PipeWarden can forward every persisted finding
+to OpenSRE's `/alerts/ingest` endpoint, where it is normalized and (by default)
+investigated inline.
+
+---
+
+## Step 1: Issue a PipeWarden API key
+
+In your PipeWarden dashboard, open any connection → **Generate API key**. PipeWarden
+returns a value prefixed with `pw_`. Copy it immediately — the cleartext is shown
+once and only the SHA-256 hash is stored.
+
+```bash
+# Issue a key directly via the REST API
+curl -X POST https://pipewarden.example.com/api/v1/connections/<name>/apikey
+```
+
+---
+
+## Step 2: Configure the integration in OpenSRE
+
+Add the following to your `.env` (or set them in your runtime environment):
+
+```bash
+PIPEWARDEN_BASE_URL=https://pipewarden.example.com
+PIPEWARDEN_API_KEY=pw_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+When `PIPEWARDEN_API_KEY` is set the integration is auto-discovered by
+`load_env_integrations()` and the two tools below become available to the
+investigation agent.
+
+---
+
+## Tools
+
+### `list_pipewarden_findings`
+
+List recent security findings (heuristic + Claude AI + DLP scanner + OPA policy
+results). Useful for correlating a CI/CD incident with secret leaks or policy
+violations on the same pipeline.
+
+| Parameter    | Type   | Notes                                            |
+|--------------|--------|--------------------------------------------------|
+| `severity`   | string | one of `info`, `low`, `medium`, `high`, `critical` |
+| `connection` | string | PipeWarden connection name                       |
+| `limit`      | int    | default 50                                       |
+
+### `list_pipewarden_pipeline_runs`
+
+List recent pipeline runs for a connection, cross-platform.
+
+| Parameter    | Type   | Notes                          |
+|--------------|--------|--------------------------------|
+| `connection` | string | required                       |
+| `repo`       | string | optional `owner/name` filter   |
+| `branch`     | string | optional branch filter         |
+| `limit`      | int    | default 10                     |
+
+---
+
+## Inbound bridge: PipeWarden → OpenSRE
+
+Set these on the **PipeWarden** side to forward findings as OpenSRE alerts:
+
+```bash
+PIPEWARDEN_OPENSRE_URL=https://opensre.example.com/alerts/ingest
+PIPEWARDEN_OPENSRE_SECRET=<shared HMAC secret>
+```
+
+Set the matching secret on **OpenSRE**:
+
+```bash
+OPENSRE_INGEST_SECRET=<same shared HMAC secret>
+# optional — set to "false" to ack-only without running an investigation
+OPENSRE_INGEST_INVESTIGATE=true
+```
+
+Every persisted PipeWarden finding becomes a POST to `/alerts/ingest` signed with
+`X-Signature-256: sha256=<hex>`. OpenSRE verifies the signature, normalizes the
+payload to `opensre.alert.v1`, runs `run_investigation_cli` in a worker thread,
+and returns the root cause + validity score in the HTTP response. Failures are
+logged with a `200` ack so PipeWarden does not retry indefinitely.
+
+---
+
+## End-to-end flow
+
+```
+PipeWarden scan
+    │
+    ▼
+Finding persisted (analysis_persist.go)
+    │
+    ▼
+OpenSRESender.SendFinding ───── POST /alerts/ingest ────► OpenSRE
+                                                            │
+                                                            ▼
+                                              HMAC verify + normalize
+                                                            │
+                                                            ▼
+                                              run_investigation_cli (thread)
+                                                            │
+                                                            ▼
+                                              Response: root_cause, is_noise,
+                                                        validity_score
+```
