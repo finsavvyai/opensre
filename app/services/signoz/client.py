@@ -7,6 +7,7 @@ enforces read-only, timeouts, and result caps.
 from __future__ import annotations
 
 import logging
+import math
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -363,7 +364,7 @@ class SigNozClient:
             def _safe_float(value: Any, default: float = 0.0) -> float:
                 try:
                     parsed = float(value)
-                    return parsed if parsed == parsed else default  # NaN check
+                    return parsed if not math.isnan(parsed) else default
                 except (TypeError, ValueError):
                     return default
 
