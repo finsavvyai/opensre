@@ -33,6 +33,7 @@ DEFAULT_SIGNOZ_MAX_RESULTS = 50
 REQUIRED_TABLES = (
     "signoz_logs.distributed_logs_v2",
     "signoz_metrics.distributed_samples_v4",
+    "signoz_metrics.distributed_time_series_v4",
     "signoz_traces.distributed_signoz_index_v3",
 )
 
