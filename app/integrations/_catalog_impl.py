@@ -1678,14 +1678,17 @@ def load_env_integrations() -> list[dict[str, Any]]:
         except Exception:
             logger.debug("Failed to load Supabase config from env", exc_info=True)
 
-    signoz_config = signoz_config_from_env()
-    if signoz_config is not None and signoz_config.is_configured:
-        integrations.append(
-            _active_env_record(
-                "signoz",
-                signoz_config.model_dump(exclude={"integration_id"}),
+    try:
+        signoz_config = signoz_config_from_env()
+        if signoz_config is not None and signoz_config.is_configured:
+            integrations.append(
+                _active_env_record(
+                    "signoz",
+                    signoz_config.model_dump(exclude={"integration_id"}),
+                )
             )
-        )
+    except Exception:
+        logger.debug("Failed to load SigNoz config from env", exc_info=True)
 
     return integrations
 

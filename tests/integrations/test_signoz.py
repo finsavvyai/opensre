@@ -1,5 +1,6 @@
 """Unit tests for the SigNoz integration module."""
 
+from app.integrations.catalog import load_env_integrations
 from app.integrations.signoz import (
     SigNozConfig,
     SigNozValidationResult,
@@ -205,3 +206,14 @@ class TestSigNozExtractParams:
         assert params["secure"] is False
         assert params["url"] == ""
         assert params["api_key"] == ""
+
+
+class TestSigNozEnvCatalogLoading:
+    """Tests for SigNoz env loading in load_env_integrations."""
+
+    def test_invalid_port_does_not_raise(self, monkeypatch) -> None:
+        monkeypatch.setenv("SIGNOZ_CLICKHOUSE_HOST", "localhost")
+        monkeypatch.setenv("SIGNOZ_CLICKHOUSE_PORT", "abc")
+        records = load_env_integrations()
+        assert isinstance(records, list)
+        assert all(record.get("service") != "signoz" for record in records)

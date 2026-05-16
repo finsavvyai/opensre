@@ -23,8 +23,6 @@ _CURATED_METRICS: dict[str, str] = {
     "cpu_usage": "system_cpu_usage",
     "memory_usage": "system_memory_usage",
     "error_rate": "signoz_calls_total",
-    "latency_p99": "signoz_latency_bucket",
-    "latency_p95": "signoz_latency_bucket",
     "request_rate": "signoz_calls_total",
 }
 

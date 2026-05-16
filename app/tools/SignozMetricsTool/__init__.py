@@ -49,7 +49,7 @@ def _metrics_extract_params(sources: dict[str, dict]) -> dict[str, Any]:
                 "type": "string",
                 "description": (
                     "Metric name: cpu_usage, memory_usage, error_rate, "
-                    "latency_p99, latency_p95, request_rate, or a raw metric name"
+                    "request_rate, or a raw metric name"
                 ),
             },
             "service": {"type": "string", "description": "Service name filter"},
