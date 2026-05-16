@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from app.integrations.signoz import SigNozConfig, signoz_extract_params, signoz_is_available
+from app.integrations.signoz import SigNozConfig, signoz_extract_params
 from app.services.signoz.client import SigNozClient
 from app.tools.tool_decorator import tool
+from app.tools.utils.availability import signoz_available_or_backend
 from app.tools.utils.compaction import compact_logs, summarize_counts
 
 
 def _logs_is_available(sources: dict[str, dict]) -> bool:
-    return signoz_is_available(sources) or bool(sources.get("signoz", {}).get("_backend"))
+    return signoz_available_or_backend(sources)
 
 
 def _logs_extract_params(sources: dict[str, dict]) -> dict[str, Any]:

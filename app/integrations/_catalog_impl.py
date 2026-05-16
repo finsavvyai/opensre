@@ -830,7 +830,7 @@ def _classify_service_instance(
                     "url": credentials.get("url", ""),
                     "api_key": credentials.get("api_key", ""),
                     "clickhouse_host": credentials.get("clickhouse_host", ""),
-                    "clickhouse_port": int(credentials.get("clickhouse_port", 9000) or 9000),
+                    "clickhouse_port": int(credentials.get("clickhouse_port", 8123) or 8123),
                     "clickhouse_database": credentials.get("clickhouse_database", "default"),
                     "clickhouse_user": credentials.get("clickhouse_user", "default"),
                     "clickhouse_password": credentials.get("clickhouse_password", ""),
