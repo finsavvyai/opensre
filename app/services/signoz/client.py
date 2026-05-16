@@ -246,8 +246,8 @@ class SigNozClient:
             "ts_bucket_start <= %(bucket_end)s",
         ]
         params: dict[str, Any] = {
-            "start": start,
-            "end": end,
+            "start": int(start.timestamp() * 1e9),
+            "end": int(end.timestamp() * 1e9),
             "bucket_start": bucket_start,
             "bucket_end": bucket_end,
             "limit": effective_limit,
