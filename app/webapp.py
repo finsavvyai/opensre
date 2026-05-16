@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
+import logging
 import os
 from typing import Any
 
@@ -12,6 +14,8 @@ from app.alerts import normalize_alert_payload
 from app.config import LLMSettings, get_environment
 from app.utils.sentry_sdk import init_sentry
 from app.version import get_version
+
+_log = logging.getLogger(__name__)
 
 init_sentry(entrypoint="webapp")
 
@@ -62,6 +66,11 @@ class AlertIngestResponse(BaseModel):
     alert_name: str | None
     severity: str | None
     source: str | None
+    investigated: bool = False
+    root_cause: str | None = None
+    is_noise: bool | None = None
+    validity_score: float | None = None
+    investigation_error: str | None = None
 
 
 def _verify_signature(secret: str, body: bytes, header: str | None) -> bool:
@@ -104,10 +113,45 @@ async def alerts_ingest(
 
     normalized = normalize_alert_payload(payload)
     canonical = normalized.get("canonical_alert", {})
+
+    investigated = False
+    root_cause: str | None = None
+    is_noise: bool | None = None
+    validity_score: float | None = None
+    investigation_error: str | None = None
+
+    # Investigation is opt-out so the ingest can be used as ack-only by
+    # setting OPENSRE_INGEST_INVESTIGATE=false. Default is investigate inline.
+    if os.getenv("OPENSRE_INGEST_INVESTIGATE", "true").strip().lower() not in {
+        "false",
+        "0",
+        "no",
+    }:
+        try:
+            from app.cli.investigation.investigate import run_investigation_cli
+
+            result: dict[str, Any] = await asyncio.to_thread(
+                run_investigation_cli, raw_alert=payload
+            )
+            investigated = True
+            root_cause = result.get("root_cause")
+            is_noise = result.get("is_noise")
+            score = result.get("validity_score")
+            if isinstance(score, (int, float)):
+                validity_score = float(score)
+        except Exception as err:  # pragma: no cover — investigation paths are deep
+            _log.warning("inline investigation failed: %s", err)
+            investigation_error = str(err)
+
     return AlertIngestResponse(
         accepted=True,
         schema_version=canonical.get("schema", "opensre.alert.v1"),
         alert_name=canonical.get("alert_name"),
         severity=canonical.get("severity"),
         source=canonical.get("alert_source"),
+        investigated=investigated,
+        root_cause=root_cause,
+        is_noise=is_noise,
+        validity_score=validity_score,
+        investigation_error=investigation_error,
     )
