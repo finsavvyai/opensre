@@ -54,3 +54,13 @@ def cloudwatch_is_available(sources: dict[str, dict]) -> bool:
     the LLM.
     """
     return bool(sources.get("cloudwatch"))
+
+
+def signoz_available_or_backend(sources: dict[str, dict]) -> bool:
+    """Available when real SigNoz credentials are present OR a fixture backend is injected.
+
+    Used by SigNoz tool wrappers whose ``extract_params`` can delegate to a
+    mock ``signoz_backend`` for synthetic tests.
+    """
+    signoz = sources.get("signoz", {})
+    return bool(signoz.get("connection_verified") or signoz.get("_backend"))
