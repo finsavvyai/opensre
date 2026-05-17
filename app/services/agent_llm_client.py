@@ -363,7 +363,15 @@ def get_agent_llm() -> _AgentClientType:
             model=settings.openai_reasoning_model,
             max_tokens=OPENAI_LLM_CONFIG.max_tokens,
         )
-    elif provider in ("openrouter", "gemini", "nvidia", "minimax", "requesty", "ollama"):
+    elif provider in (
+        "openrouter",
+        "gemini",
+        "nvidia",
+        "minimax",
+        "requesty",
+        "ollama",
+        "deepseek",
+    ):
         # All OpenAI-compatible providers
         from app.config import LLMSettings
 
@@ -389,6 +397,7 @@ def get_agent_llm() -> _AgentClientType:
 
 def _create_openai_compat_client(settings: Any, provider: str) -> OpenAIAgentClient:
     from app.config import (
+        DEEPSEEK_BASE_URL,
         GEMINI_BASE_URL,
         MINIMAX_BASE_URL,
         NVIDIA_BASE_URL,
@@ -408,6 +417,11 @@ def _create_openai_compat_client(settings: Any, provider: str) -> OpenAIAgentCli
             "https://router.requesty.ai/v1",
             "REQUESTY_API_KEY",
             settings.requesty_reasoning_model,
+        ),
+        "deepseek": (
+            DEEPSEEK_BASE_URL,
+            "DEEPSEEK_API_KEY",
+            settings.deepseek_reasoning_model,
         ),
     }
     if provider == "ollama":

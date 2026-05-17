@@ -11,6 +11,7 @@ from typing import Literal
 from app.config import (
     ANTHROPIC_REASONING_MODEL,
     BEDROCK_REASONING_MODEL,
+    DEEPSEEK_REASONING_MODEL,
     DEFAULT_OLLAMA_HOST,
     DEFAULT_OLLAMA_MODEL,
     GEMINI_REASONING_MODEL,
@@ -145,6 +146,11 @@ NVIDIA_MODELS = (
         label="Nemotron 3 Super 120B (5x higher throughput for agentic AI)",
     ),
     ModelOption(value="nvidia/nemotron-3-nano-30b-a3b", label="Nemotron 3 Nano 30B"),
+)
+
+DEEPSEEK_MODELS = (
+    ModelOption(value=DEEPSEEK_REASONING_MODEL, label="DeepSeek Reasoner (R1)"),
+    ModelOption(value="deepseek-chat", label="DeepSeek Chat (V3 general)"),
 )
 
 BEDROCK_MODELS = (
@@ -407,6 +413,17 @@ SUPPORTED_PROVIDERS = (
         models=NVIDIA_MODELS,
         legacy_model_env="NVIDIA_MODEL",
         toolcall_model_env="NVIDIA_TOOLCALL_MODEL",
+    ),
+    ProviderOption(
+        value="deepseek",
+        label="DeepSeek (native API)",
+        group="Hosted providers",
+        api_key_env="DEEPSEEK_API_KEY",
+        model_env="DEEPSEEK_REASONING_MODEL",
+        default_model=DEEPSEEK_REASONING_MODEL,
+        models=DEEPSEEK_MODELS,
+        legacy_model_env="DEEPSEEK_MODEL",
+        toolcall_model_env="DEEPSEEK_TOOLCALL_MODEL",
     ),
     ProviderOption(
         value="bedrock",

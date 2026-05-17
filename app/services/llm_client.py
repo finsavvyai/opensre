@@ -39,6 +39,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.config import (
     ANTHROPIC_LLM_CONFIG,
+    DEEPSEEK_BASE_URL,
     GEMINI_BASE_URL,
     MINIMAX_BASE_URL,
     NVIDIA_BASE_URL,
@@ -1136,6 +1137,16 @@ def _create_llm_client(model_type: ModelType) -> _LLMClientType:
             base_url=MINIMAX_BASE_URL,
             api_key_env="MINIMAX_API_KEY",
             temperature=1.0,
+        )
+    elif provider == "deepseek":
+        from app.config import DEEPSEEK_LLM_CONFIG
+
+        config = DEEPSEEK_LLM_CONFIG
+        return OpenAILLMClient(
+            model=_select_model(settings, "deepseek", model_type),
+            max_tokens=config.max_tokens,
+            base_url=DEEPSEEK_BASE_URL,
+            api_key_env="DEEPSEEK_API_KEY",
         )
     elif provider == "ollama":
         from app.config import OLLAMA_LLM_CONFIG
